@@ -1,0 +1,9 @@
+ifneq ($(KERNELRELEASE),)
+
+EXTRA_CFLAGS += $(MOD_EXTRA_C_FLAGS)
+
+$(MOD_NAME)-objs := $(MOD_OBJS)
+
+obj-m := $(MOD_NAME).o
+
+endif
