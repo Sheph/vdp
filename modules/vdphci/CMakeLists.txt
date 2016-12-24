@@ -1,10 +1,22 @@
 set(SRC
     main.c
+    vdphci_platform_driver.c
+    vdphci_controllers.c
+    vdphci_hcd.c
+    vdphci_device.c
+    vdphci_port.c
+    vdphci_direct_io.c
 )
 
 set(HDRS
     debug.h
     print.h
+    vdphci_platform_driver.h
+    vdphci_controllers.h
+    vdphci_hcd.h
+    vdphci_device.h
+    vdphci_port.h
+    vdphci_direct_io.h
 )
 
 set(VDPHCI_C_FLAGS -Wall -I${VDP_INCLUDE_DIRECTORIES})
