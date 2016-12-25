@@ -63,6 +63,9 @@ if (CMAKE_COMPILER_IS_GNUCC)
 endif ()
 
 add_subdirectory(modules)
+add_subdirectory(lwl-1.1)
+add_subdirectory(vdpusb)
+add_subdirectory(apps)
 
 #remove eclipse generator garbage
 
