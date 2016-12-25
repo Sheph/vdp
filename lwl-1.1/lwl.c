@@ -2,8 +2,8 @@
  * This file is part of Log Writer Library (LWL).
  * Copyright (C) 2002, 2003, 2004, 2005 Nicolas Darnis <ndarnis@free.fr>
  *
- * The LWL library is free software; you can redistribute it and/or 
- * modify it under the terms of the GNU General Public License as 
+ * The LWL library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation; either version 2 of
  * the License, or (at your option) any later version.
  *
@@ -14,7 +14,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with the LWL library; see the file COPYING.
- * If not, write to the Free Software Foundation, Inc., 
+ * If not, write to the Free Software Foundation, Inc.,
  * 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA.
  *
  * $RCSfile: lwl.c,v $
@@ -49,7 +49,7 @@ struct _lwl_handle
   char*          log_adr;
 };
 
-static const char* 
+static const char*
 level_to_string (lwl_priority_t log_priority);
 
 extern lwlh_t
@@ -57,14 +57,14 @@ lwl_alloc (void)
 {
   int i;
   lwlh_t h;
-  
+
   h = (lwlh_t) malloc (sizeof (struct _lwl_handle));
 
   if (h == NULL)
     {
       return NULL;
     }
-  
+
   h->log_level   = LWL_PRI_DEBUG;
   h->log_prefix  = NULL;
   h->log_options = 0;
@@ -122,86 +122,87 @@ lwl_write_log (lwlh_t h, lwl_priority_t pri, char *format, ...)
       default_file = h->log_files[pri];
     }
 
-  va_start (ap, format);
-
   while (1)
     {
       msg = realloc (msg, taille);
 
       if (msg == NULL)
-	{
-	  break;
-	}
-      
+        {
+          break;
+        }
+
+      va_start (ap, format);
+
       n = vsnprintf (msg, taille, format, ap);
 
+      va_end (ap);
+
       if (n >= 0 && n < taille)
-	{
-	  break;
-	}
+        {
+          break;
+        }
 
       taille += 64;
     }
 
-  va_end (ap);
-  
+
   if (msg == NULL)
     {
       return;
     }
-  
+
   if (h->log_options & LWL_OPT_DATE || h->log_options & LWL_OPT_TIME)
     {
       char      date[20];
       char      heure[20];
       time_t    time_now;
       struct tm temps_now;
-      
+
       time (&time_now);
       localtime_r (&time_now, &temps_now);
 
       if (h->log_options & LWL_OPT_DATE)
-	{
-	  msg2 = (char*) realloc (msg2, msg2_size + sizeof (date));
+        {
+          msg2 = (char*) realloc (msg2, msg2_size + sizeof (date));
 
-	  if (msg2 != NULL)
-	    {
-	      if (h->log_options & LWL_OPT_USE_LOCALE)
-		{
-		  msg2_size += strftime (&msg2[msg2_size-1], 1 + sizeof (date), "%x", &temps_now);
-		}
-	      else
-		{
-		  msg2_size += strftime (&msg2[msg2_size-1], 1 + sizeof (date), "%Y.%m.%d", &temps_now);
-		}
+          if (msg2 != NULL)
+            {
+              if (h->log_options & LWL_OPT_USE_LOCALE)
+                {
+                  msg2_size += strftime (&msg2[msg2_size-1], 1 + sizeof (date), "%x", &temps_now);
+                }
+              else
+                {
+                  msg2_size += strftime (&msg2[msg2_size-1], 1 + sizeof (date), "%Y.%m.%d", &temps_now);
+                }
 
-	      space = 1;
-	    }
-	}
-      
+              space = 1;
+            }
+        }
+
       if (h->log_options & LWL_OPT_TIME)
-	{
-	  msg2 = (char*) realloc (msg2, msg2_size + space + sizeof (heure));
+        {
+          msg2 = (char*) realloc (msg2, msg2_size + space + sizeof (heure));
 
-	  if (msg2 != NULL)
-	    {
-	      if (space == 1) 
-		{
-		  msg2_size += sprintf (&msg2[msg2_size-1], " ");
-		}
-	      
-	      if (h->log_options & LWL_OPT_USE_LOCALE)
-		{
-		  msg2_size += strftime (&msg2[msg2_size-1], 1 + sizeof (heure), "%X", &temps_now);
-		}
-	      else
-		{
-		  msg2_size += strftime (&msg2[msg2_size-1], 1 + sizeof (heure), "%H:%M:%S", &temps_now);
-		}
+          if (msg2 != NULL)
+            {
+              if (space == 1)
+                {
+                  msg2_size += sprintf (&msg2[msg2_size-1], " ");
+                }
 
-	      space = 1;
-	    }
-	}
+              if (h->log_options & LWL_OPT_USE_LOCALE)
+                {
+                  msg2_size += strftime (&msg2[msg2_size-1], 1 + sizeof (heure), "%X", &temps_now);
+                }
+              else
+                {
+                  msg2_size += strftime (&msg2[msg2_size-1], 1 + sizeof (heure), "%H:%M:%S", &temps_now);
+                }
+
+              space = 1;
+            }
+        }
     }
 
   if (h->log_options & LWL_OPT_IP)
@@ -209,53 +210,53 @@ lwl_write_log (lwlh_t h, lwl_priority_t pri, char *format, ...)
       msg2 = (char*) realloc (msg2, msg2_size + space + strlen (h->log_ip));
 
       if (msg2 != NULL)
-	{
-	  msg2_size += snprintf (&msg2[msg2_size-1], 1 + space + strlen (h->log_ip), "%c%s", space == 1 ? ' ' : 0, h->log_ip);
-	  space = 1;
-	}
+        {
+          msg2_size += snprintf (&msg2[msg2_size-1], 1 + space + strlen (h->log_ip), "%c%s", space == 1 ? ' ' : 0, h->log_ip);
+          space = 1;
+        }
     }
-  
+
   if (h->log_options & LWL_OPT_ADR)
     {
       msg2 = (char*) realloc (msg2, msg2_size + space + strlen (h->log_adr));
 
       if (msg2 != NULL)
-	{
-	  msg2_size += snprintf (&msg2[msg2_size-1], 1 + space + strlen (h->log_adr), "%c%s", space == 1 ? ' ' : 0, h->log_adr);
-	  space = 1;
-	}
+        {
+          msg2_size += snprintf (&msg2[msg2_size-1], 1 + space + strlen (h->log_adr), "%c%s", space == 1 ? ' ' : 0, h->log_adr);
+          space = 1;
+        }
     }
-  
+
   if (h->log_options & LWL_OPT_PREFIX)
     {
       msg2 = (char*) realloc (msg2, msg2_size + space + strlen (h->log_prefix));
 
       if (msg2 != NULL)
-	{
-	  msg2_size += snprintf (&msg2[msg2_size-1], 1 + space + strlen (h->log_prefix), "%c%s", space == 1 ? ' ' : 0, h->log_prefix);
-	  space = 1;
-	}
+        {
+          msg2_size += snprintf (&msg2[msg2_size-1], 1 + space + strlen (h->log_prefix), "%c%s", space == 1 ? ' ' : 0, h->log_prefix);
+          space = 1;
+        }
     }
-  
+
   if (h->log_options & LWL_OPT_PID)
     {
       msg2 = (char*) realloc (msg2, msg2_size + space + 10);
 
       if (msg2 != NULL)
-	{
-	  msg2_size += snprintf (&msg2[msg2_size-1], 1 + space + 10, "%c%10d", space == 1 ? ' ' : 0, getpid ());
-	  space = 1;
-	}
+        {
+          msg2_size += snprintf (&msg2[msg2_size-1], 1 + space + 10, "%c%10d", space == 1 ? ' ' : 0, getpid ());
+          space = 1;
+        }
     }
-  
+
   if (h->log_options & LWL_OPT_PRIORITY)
     {
       msg2 = (char*) realloc (msg2, msg2_size + space + strlen (level_to_string (pri)));
 
       if (msg2 != NULL)
-	{
-	  msg2_size += snprintf (&msg2[msg2_size-1], 1 + space + strlen (level_to_string (pri)), "%c%s", space == 1 ? ' ' : 0, level_to_string (pri));
-	}
+        {
+          msg2_size += snprintf (&msg2[msg2_size-1], 1 + space + strlen (level_to_string (pri)), "%c%s", space == 1 ? ' ' : 0, level_to_string (pri));
+        }
     }
 
   if (msg2 != NULL)
@@ -263,9 +264,9 @@ lwl_write_log (lwlh_t h, lwl_priority_t pri, char *format, ...)
       fprintf (default_file, "%s: %s\n", msg2, msg);
 
       if (h->log_options & LWL_OPT_PERROR)
-	{
-	  fprintf (stderr, "%s: %s\n", msg2, msg);
-	}
+        {
+          fprintf (stderr, "%s: %s\n", msg2, msg);
+        }
 
       free (msg2);
     }
@@ -279,9 +280,9 @@ lwl_write_log (lwlh_t h, lwl_priority_t pri, char *format, ...)
       fflush (default_file);
 
       if (h->log_options & LWL_OPT_PERROR)
-	{
-	  fflush (stderr);
-	}
+        {
+          fflush (stderr);
+        }
     }
 
   free (msg);
@@ -298,116 +299,116 @@ lwl_set_attributes (lwlh_t h, lwl_tag_t tag, ...)
   while (tagl != LWL_TAG_DONE)
     {
       switch (tagl)
-	{
-	case LWL_TAG_LEVEL:
-	  {
-	    lwl_priority_t pri = va_arg (ap, lwl_priority_t);
-	    if (pri < LWL_PRI_EMERG || pri > LWL_PRI_DEBUG)
-	      {
-		return -1;
-	      }
-	    h->log_level = pri;
-	  }
-	  break;
+        {
+        case LWL_TAG_LEVEL:
+          {
+            lwl_priority_t pri = va_arg (ap, lwl_priority_t);
+            if (pri < LWL_PRI_EMERG || pri > LWL_PRI_DEBUG)
+              {
+                return -1;
+              }
+            h->log_level = pri;
+          }
+          break;
 
-	case LWL_TAG_PREFIX:
-	  if (h->log_prefix != NULL)
-	    {
-	      free (h->log_prefix);
-	    }
+        case LWL_TAG_PREFIX:
+          if (h->log_prefix != NULL)
+            {
+              free (h->log_prefix);
+            }
 
-	  h->log_prefix = strdup (va_arg (ap, char*));
+          h->log_prefix = strdup (va_arg (ap, char*));
 
-	  if (h->log_prefix == NULL)
-	    {
-	      return -1;
-	    }
-	  break;
-	  
-	case LWL_TAG_OPTIONS:
-	  {
-	    lwl_option_t opt = va_arg (ap, lwl_option_t);
-	    
-	    if (opt != h->log_options)
-	      {
-		h->log_options = opt;
-		
-		if (h->log_options & LWL_OPT_IP || h->log_options & LWL_OPT_ADR)
-		  {
-		    char hostname [128];
-		    
-		    if (gethostname (hostname, sizeof (hostname)) == 0)
-		      {
-			struct hostent* he = gethostbyname (hostname);
+          if (h->log_prefix == NULL)
+            {
+              return -1;
+            }
+          break;
 
-			if (he != NULL)
-			  {
-			    int n;
-			    struct in_addr* ip = (struct in_addr*) (he->h_addr_list [0]);
-			    strncpy (h->log_ip, inet_ntoa (*ip), IP_LGTH);
-			    
-			    n = 1 + strlen (he->h_name);
-			    
-			    if (h->log_adr != NULL)
-			      {
-				free (h->log_adr);
-			      }
-			    
-			    h->log_adr = (char*) malloc (n * sizeof (char));
-			    if (h->log_adr != NULL)
-			      {
-				strncpy (h->log_adr, he->h_name, n);
-			      }
-			  }
-		      }
-		  }
-	      }
-	  }
-	  break;
+        case LWL_TAG_OPTIONS:
+          {
+            lwl_option_t opt = va_arg (ap, lwl_option_t);
 
-	case LWL_TAG_FILE:
-	  h->log_files[LWL_PRI_DEBUG+1] = va_arg (ap, FILE*);
-	  break;
+            if (opt != h->log_options)
+              {
+                h->log_options = opt;
 
-	case LWL_TAG_FILE_EMERG:
-	  h->log_files[LWL_PRI_EMERG] = va_arg (ap, FILE*);
-	  break;
+                if (h->log_options & LWL_OPT_IP || h->log_options & LWL_OPT_ADR)
+                  {
+                    char hostname [128];
 
-	case LWL_TAG_FILE_ALERT:
-	  h->log_files[LWL_PRI_ALERT] = va_arg (ap, FILE*);
-	  break;
+                    if (gethostname (hostname, sizeof (hostname)) == 0)
+                      {
+                        struct hostent* he = gethostbyname (hostname);
 
-	case LWL_TAG_FILE_CRIT:
-	  h->log_files[LWL_PRI_CRIT] = va_arg (ap, FILE*);
-	  break;
+                        if (he != NULL)
+                          {
+                            int n;
+                            struct in_addr* ip = (struct in_addr*) (he->h_addr_list [0]);
+                            strncpy (h->log_ip, inet_ntoa (*ip), IP_LGTH);
 
-	case LWL_TAG_FILE_ERR:
-	  h->log_files[LWL_PRI_ERR] = va_arg (ap, FILE *);
-	  break;
+                            n = 1 + strlen (he->h_name);
 
-	case LWL_TAG_FILE_WARNING:
-	  h->log_files[LWL_PRI_WARNING] = va_arg (ap, FILE*);
-	  break;
+                            if (h->log_adr != NULL)
+                              {
+                                free (h->log_adr);
+                              }
 
-	case LWL_TAG_FILE_NOTICE:
-	  h->log_files[LWL_PRI_NOTICE] = va_arg (ap, FILE*);
-	  break;
+                            h->log_adr = (char*) malloc (n * sizeof (char));
+                            if (h->log_adr != NULL)
+                              {
+                                strncpy (h->log_adr, he->h_name, n);
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+          break;
 
-	case LWL_TAG_FILE_INFO:
-	  h->log_files[LWL_PRI_INFO] = va_arg (ap, FILE*);
-	  break;
+        case LWL_TAG_FILE:
+          h->log_files[LWL_PRI_DEBUG+1] = va_arg (ap, FILE*);
+          break;
 
-	case LWL_TAG_FILE_DEBUG:
-	  h->log_files[LWL_PRI_DEBUG] = va_arg (ap, FILE*);
-	  break;
+        case LWL_TAG_FILE_EMERG:
+          h->log_files[LWL_PRI_EMERG] = va_arg (ap, FILE*);
+          break;
 
-	default:
-	  return -1;
-	}
+        case LWL_TAG_FILE_ALERT:
+          h->log_files[LWL_PRI_ALERT] = va_arg (ap, FILE*);
+          break;
+
+        case LWL_TAG_FILE_CRIT:
+          h->log_files[LWL_PRI_CRIT] = va_arg (ap, FILE*);
+          break;
+
+        case LWL_TAG_FILE_ERR:
+          h->log_files[LWL_PRI_ERR] = va_arg (ap, FILE *);
+          break;
+
+        case LWL_TAG_FILE_WARNING:
+          h->log_files[LWL_PRI_WARNING] = va_arg (ap, FILE*);
+          break;
+
+        case LWL_TAG_FILE_NOTICE:
+          h->log_files[LWL_PRI_NOTICE] = va_arg (ap, FILE*);
+          break;
+
+        case LWL_TAG_FILE_INFO:
+          h->log_files[LWL_PRI_INFO] = va_arg (ap, FILE*);
+          break;
+
+        case LWL_TAG_FILE_DEBUG:
+          h->log_files[LWL_PRI_DEBUG] = va_arg (ap, FILE*);
+          break;
+
+        default:
+          return -1;
+        }
 
       tagl = va_arg (ap, lwl_tag_t);
     }
-  
+
   va_end (ap);
 
   return 0;
@@ -431,7 +432,7 @@ lwl_get_hostname (const lwlh_t h)
   return h->log_adr;
 }
 
-static const char* 
+static const char*
 level_to_string (lwl_priority_t pri)
 {
   switch (pri)

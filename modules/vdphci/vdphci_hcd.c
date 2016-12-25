@@ -4,36 +4,35 @@
 #include "print.h"
 
 #define VDPHCI_PORT_C_MASK \
-    ( (USB_PORT_STAT_C_CONNECTION |\
-       USB_PORT_STAT_C_ENABLE |\
-       USB_PORT_STAT_C_SUSPEND |\
-       USB_PORT_STAT_C_OVERCURRENT |\
-       USB_PORT_STAT_C_RESET) << 16 )
+    ((USB_PORT_STAT_C_CONNECTION |\
+      USB_PORT_STAT_C_ENABLE |\
+      USB_PORT_STAT_C_SUSPEND |\
+      USB_PORT_STAT_C_OVERCURRENT |\
+      USB_PORT_STAT_C_RESET) << 16)
 
 static const char vdphci_hcd_name[] = VDPHCI_NAME "_hcd";
 
 #ifdef DEBUG
 
 #define VDPHCI_PORT_FEATURE_TO_STR(prefix, feature) \
-    switch (feature) \
-    { \
-        case USB_PORT_FEAT_CONNECTION: return prefix "USB_PORT_FEAT_CONNECTION"; \
-        case USB_PORT_FEAT_ENABLE: return prefix "USB_PORT_FEAT_ENABLE"; \
-        case USB_PORT_FEAT_SUSPEND: return prefix "USB_PORT_FEAT_SUSPEND"; \
-        case USB_PORT_FEAT_OVER_CURRENT: return prefix "USB_PORT_FEAT_OVER_CURRENT"; \
-        case USB_PORT_FEAT_RESET: return prefix "USB_PORT_FEAT_RESET"; \
-        case USB_PORT_FEAT_L1: return prefix "USB_PORT_FEAT_L1"; \
-        case USB_PORT_FEAT_POWER: return prefix "USB_PORT_FEAT_POWER"; \
-        case USB_PORT_FEAT_LOWSPEED: return prefix "USB_PORT_FEAT_LOWSPEED"; \
-        case USB_PORT_FEAT_C_CONNECTION: return prefix "USB_PORT_FEAT_C_CONNECTION"; \
-        case USB_PORT_FEAT_C_ENABLE: return prefix "USB_PORT_FEAT_C_ENABLE"; \
-        case USB_PORT_FEAT_C_SUSPEND: return prefix "USB_PORT_FEAT_C_SUSPEND"; \
-        case USB_PORT_FEAT_C_OVER_CURRENT: return prefix "USB_PORT_FEAT_C_OVER_CURRENT"; \
-        case USB_PORT_FEAT_C_RESET: return prefix "USB_PORT_FEAT_C_RESET"; \
-        case USB_PORT_FEAT_TEST: return prefix "USB_PORT_FEAT_TEST"; \
-        case USB_PORT_FEAT_INDICATOR: return prefix "USB_PORT_FEAT_INDICATOR"; \
-        case USB_PORT_FEAT_C_PORT_L1: return prefix "USB_PORT_FEAT_C_PORT_L1"; \
-        default: return prefix "USB_PORT_FEAT_XXX"; \
+    switch (feature) { \
+    case USB_PORT_FEAT_CONNECTION: return prefix "USB_PORT_FEAT_CONNECTION"; \
+    case USB_PORT_FEAT_ENABLE: return prefix "USB_PORT_FEAT_ENABLE"; \
+    case USB_PORT_FEAT_SUSPEND: return prefix "USB_PORT_FEAT_SUSPEND"; \
+    case USB_PORT_FEAT_OVER_CURRENT: return prefix "USB_PORT_FEAT_OVER_CURRENT"; \
+    case USB_PORT_FEAT_RESET: return prefix "USB_PORT_FEAT_RESET"; \
+    case USB_PORT_FEAT_L1: return prefix "USB_PORT_FEAT_L1"; \
+    case USB_PORT_FEAT_POWER: return prefix "USB_PORT_FEAT_POWER"; \
+    case USB_PORT_FEAT_LOWSPEED: return prefix "USB_PORT_FEAT_LOWSPEED"; \
+    case USB_PORT_FEAT_C_CONNECTION: return prefix "USB_PORT_FEAT_C_CONNECTION"; \
+    case USB_PORT_FEAT_C_ENABLE: return prefix "USB_PORT_FEAT_C_ENABLE"; \
+    case USB_PORT_FEAT_C_SUSPEND: return prefix "USB_PORT_FEAT_C_SUSPEND"; \
+    case USB_PORT_FEAT_C_OVER_CURRENT: return prefix "USB_PORT_FEAT_C_OVER_CURRENT"; \
+    case USB_PORT_FEAT_C_RESET: return prefix "USB_PORT_FEAT_C_RESET"; \
+    case USB_PORT_FEAT_TEST: return prefix "USB_PORT_FEAT_TEST"; \
+    case USB_PORT_FEAT_INDICATOR: return prefix "USB_PORT_FEAT_INDICATOR"; \
+    case USB_PORT_FEAT_C_PORT_L1: return prefix "USB_PORT_FEAT_C_PORT_L1"; \
+    default: return prefix "USB_PORT_FEAT_XXX"; \
     }
 
 static const char* vdphci_request_to_str(u16 typeReq, u16 wValue)
@@ -757,6 +756,8 @@ int vdphci_hcd_add(struct device* controller,
     if (!*hcd) {
         return -ENOMEM;
     }
+
+    (*hcd)->has_tt = 1;
 
     /*
      * fill HCD platform data

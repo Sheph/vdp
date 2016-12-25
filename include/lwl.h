@@ -213,7 +213,7 @@ lwl_alloc (void);
  */
 extern void
 lwl_free (lwlh_t HANDLE
-	  );
+          );
 
 /**
  * @brief Log a message to the files associated to a LWL handle.
@@ -246,10 +246,10 @@ lwl_free (lwlh_t HANDLE
  */
 extern void
 lwl_write_log (lwlh_t HANDLE,
-	       lwl_priority_t PRI,
-	       char *FORMAT,
-	       ...
-	       );
+               lwl_priority_t PRI,
+               char *FORMAT,
+               ...
+               );
 
 /**
  * @brief Modify the attributes of a LWL handle.
@@ -278,9 +278,9 @@ lwl_write_log (lwlh_t HANDLE,
  */
 extern int
 lwl_set_attributes (lwlh_t HANDLE,
-		    lwl_tag_t TAGS,
-		    ...
-		    );
+                    lwl_tag_t TAGS,
+                    ...
+                    );
 
 /**
  * @brief Get the actual log level of a LWL handle.
@@ -290,7 +290,7 @@ lwl_set_attributes (lwlh_t HANDLE,
  */
 extern lwl_priority_t
 lwl_get_log_level (const lwlh_t HANDLE
-		   );
+                   );
 
 /**
  * @brief Get the actual default file where a LWL handle is logging into.
@@ -300,7 +300,7 @@ lwl_get_log_level (const lwlh_t HANDLE
  */
 extern FILE*
 lwl_get_default_log_file (const lwlh_t HANDLE
-			  );
+                          );
 
 /**
  * @brief Alias for lwl_get_default_log_file()
@@ -319,7 +319,7 @@ lwl_get_default_log_file (const lwlh_t HANDLE
  */
 extern const char*
 lwl_get_hostname (lwlh_t HANDLE
-		  );
+                  );
 
 
 /*
