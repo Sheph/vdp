@@ -329,9 +329,9 @@ static int vdphci_urb_enqueue(struct usb_hcd* uhcd,
             vdphci_ctrl_request_type_type_to_str(req->bRequestType),
             vdphci_ctrl_request_type_recipient_to_str(req->bRequestType),
             vdphci_ctrl_request_to_str(req->bRequest),
-            req->wValue,
-            req->wIndex,
-            req->wLength);
+            le16_to_cpu(req->wValue),
+            le16_to_cpu(req->wIndex),
+            le16_to_cpu(req->wLength));
     }
 #endif
 

@@ -6,6 +6,32 @@
 #include "vdphci_hcd.h"
 #include "vdphci_direct_io.h"
 
+static int vdphci_device_translate_urb_status(vdphci_urb_status status, int* res)
+{
+    switch (status) {
+    case vdphci_urb_status_completed:
+        *res = 0;
+        break;
+    case vdphci_urb_status_unlinked:
+        *res = -ENOENT;
+        break;
+    case vdphci_urb_status_error:
+        *res = -EPROTO;
+        break;
+    case vdphci_urb_status_stall:
+        *res = -EPIPE;
+        break;
+    case vdphci_urb_status_overflow:
+        *res = -EOVERFLOW;
+        break;
+    case vdphci_urb_status_unprocessed:
+    default:
+        return 0;
+    }
+
+    return 1;
+}
+
 /*
  * 'cdev_mutex' must be held
  */
@@ -108,19 +134,27 @@ static int vdphci_device_release(struct inode* inode, struct file* file)
     return 0;
 }
 
-static int vdphci_device_process_signal_devent(struct vdphci_device* device, const char __user* buf, size_t count)
+/*
+ * count is >= sizeof(struct vdphci_devent_header)
+ * @{
+ */
+
+static int vdphci_device_process_signal_devent(struct vdphci_device* device, const char __user* buf,
+    struct page** pages,
+    size_t count)
 {
     struct vdphci_devent_signal signal_devent;
     int retval = 0;
 
-    if (count != sizeof(signal_devent)) {
+    if (count != (sizeof(struct vdphci_devent_header) + sizeof(signal_devent))) {
         return -EINVAL;
     }
 
-    retval = copy_from_user(&signal_devent, (struct vdphci_devent_signal __user*)buf, sizeof(signal_devent));
+    retval = vdphci_direct_read(&signal_devent, sizeof(signal_devent),
+        sizeof(struct vdphci_devent_header), buf, pages);
 
     if (retval != 0) {
-        return -EFAULT;
+        return retval;
     }
 
     switch (signal_devent.signal) {
@@ -137,13 +171,125 @@ static int vdphci_device_process_signal_devent(struct vdphci_device* device, con
         break;
     }
 
-    return ((retval != 0) ? retval : sizeof(signal_devent));
+    return retval;
 }
 
-static int vdphci_device_process_urb_devent(const char __user* buf, size_t count)
+/*
+ * URB writing routines, i.e they're called when the user wants to complete an URB.
+ * The 'count' is the number of bytes to hold THE EVENT BUFFER.
+ * The return value is either "< 0 error" or "0 success".
+ * @{
+ */
+
+static int vdphci_device_write_in_control_urb(const struct vdphci_devent_urb* urb_devent,
+    struct urb* urb,
+    const char __user* buf,
+    struct page** pages,
+    size_t count)
 {
-    return -EINVAL;
+    int retval = 0;
+
+    if (count > urb->transfer_buffer_length) {
+        return -EINVAL;
+    }
+
+    if (count != urb_devent->actual_length) {
+        return -EINVAL;
+    }
+
+    retval = vdphci_direct_read(urb->transfer_buffer, count,
+        sizeof(struct vdphci_devent_header) + offsetof(struct vdphci_devent_urb, data.buff),
+        buf, pages);
+
+    if (retval != 0) {
+        return retval;
+    }
+
+    if (!vdphci_device_translate_urb_status(urb_devent->status, &urb->status)) {
+        return -EINVAL;
+    }
+
+    urb->actual_length = count;
+
+    return 0;
 }
+
+/*
+ * @}
+ */
+
+static int vdphci_device_process_urb_devent(struct vdphci_device* device, const char __user* buf,
+    struct page** pages,
+    size_t count)
+{
+    struct vdphci_devent_urb urb_devent;
+    int retval = 0;
+    unsigned long flags;
+    struct vdphci_khevent_urb* urb_khevent;
+    struct list_head giveback_list;
+    size_t event_data_size = count - sizeof(struct vdphci_devent_header) - offsetof(struct vdphci_devent_urb, data.buff);
+
+    INIT_LIST_HEAD(&giveback_list);
+
+    if (count < (sizeof(struct vdphci_devent_header) + offsetof(struct vdphci_devent_urb, data.buff))) {
+        return -EINVAL;
+    }
+
+    retval = vdphci_direct_read(&urb_devent, offsetof(struct vdphci_devent_urb, data.buff),
+        sizeof(struct vdphci_devent_header), buf, pages);
+
+    if (retval != 0) {
+        return retval;
+    }
+
+    vdphci_hcd_lock(device->parent_hcd, flags);
+
+    urb_khevent = vdphci_port_khevent_urb_find(device->port, urb_devent.seq_num);
+
+    if (!urb_khevent) {
+        retval = 0;
+
+        goto out;
+    }
+
+    if (usb_pipein(urb_khevent->urb->pipe)) {
+        switch (usb_pipetype(urb_khevent->urb->pipe)) {
+        case PIPE_CONTROL: {
+            retval = vdphci_device_write_in_control_urb(&urb_devent,
+                urb_khevent->urb,
+                buf,
+                pages,
+                event_data_size);
+            break;
+        }
+        case PIPE_BULK:
+        case PIPE_INTERRUPT:
+        case PIPE_ISOCHRONOUS:
+        default:
+            print_error("Bad URB pipe type: %d\n", usb_pipetype(urb_khevent->urb->pipe));
+            urb_khevent->urb->status = -EPROTO;
+            retval = 0;
+        }
+    } else {
+        urb_khevent->urb->status = -EPROTO;
+        retval = 0;
+    }
+
+    if (retval >= 0) {
+        vdphci_port_khevent_urb_remove(device->port, urb_khevent, &giveback_list);
+    }
+
+out:
+    vdphci_hcd_unlock(device->parent_hcd, flags);
+
+    vdphci_port_giveback_urbs(&giveback_list);
+
+    return retval;
+}
+
+/*
+ * @}
+ */
 
 /*
  * Called with HCD lock being held. Also, count is >= sizeof(struct vdphci_hevent_header)
@@ -387,9 +533,11 @@ static int vdphci_device_process_no_hevent(
 
 static ssize_t vdphci_device_write(struct file* file, const char __user* buf, size_t count, loff_t* f_pos)
 {
-    struct vdphci_devent_header header;
     struct vdphci_device* device = file->private_data;
     int retval = 0;
+    struct page** pages;
+    int num_pages;
+    struct vdphci_devent_header header;
 
     dprintk("%s, device %d: write %d to file %p\n",
         vdphci_hcd_to_usb_hcd(device->parent_hcd)->self.bus_name,
@@ -407,35 +555,41 @@ static ssize_t vdphci_device_write(struct file* file, const char __user* buf, si
         goto fail;
     }
 
-    retval = copy_from_user(&header, (struct vdphci_devent_header __user*)buf, sizeof(header));
+    retval = vdphci_direct_read_start(buf, count, &pages, &num_pages);
 
     if (retval != 0) {
-        retval = -EFAULT;
+        goto fail;
+    }
+
+    retval = vdphci_direct_read(&header, sizeof(header), 0, buf, pages);
+
+    if (retval != 0) {
+        vdphci_direct_read_end(pages, num_pages);
 
         goto fail;
     }
 
     switch (header.type) {
     case vdphci_devent_type_signal: {
-        retval = vdphci_device_process_signal_devent(device, buf + sizeof(header), count - sizeof(header));
+        retval = vdphci_device_process_signal_devent(device, buf, pages, count);
         break;
     }
     case vdphci_devent_type_urb: {
-        retval = vdphci_device_process_urb_devent(buf + sizeof(header), count - sizeof(header));
+        retval = vdphci_device_process_urb_devent(device, buf, pages, count);
         break;
     }
     default:
         retval = -EINVAL;
-        goto fail;
+        break;
     }
+
+    vdphci_direct_read_end(pages, num_pages);
 
     if (retval < 0) {
         goto fail;
     }
 
-    BUG_ON(retval > (count - sizeof(header)));
-
-    *f_pos += retval;
+    *f_pos += count;
 
 fail:
     mutex_unlock(&device->cdev_mutex);

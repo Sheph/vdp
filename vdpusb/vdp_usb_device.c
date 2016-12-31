@@ -484,3 +484,17 @@ vdp_usb_result vdp_usb_complete_urb(struct vdp_usb_urb* urb)
         return vdp_usb_success;
     }
 }
+
+void vdp_usb_free_urb(struct vdp_usb_urb* urb)
+{
+    struct vdp_usb_urbi* urbi;
+
+    assert(urb);
+    if (!urb) {
+        return;
+    }
+
+    urbi = vdp_containerof(urb, struct vdp_usb_urbi, urb);
+
+    vdp_usb_urbi_destroy(urbi);
+}

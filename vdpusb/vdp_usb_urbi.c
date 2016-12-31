@@ -1,6 +1,7 @@
 #include "vdp_usb_urbi.h"
 #include "vdp_usb_device.h"
 #include "vdp_usb_context.h"
+#include "vdp/byte_order.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -92,7 +93,7 @@ static void urbi_fill_common(struct vdp_usb_device* device,
     urbi->devent_header.type = vdphci_devent_type_urb;
 
     urbi->devent_urb.seq_num = urb->seq_num;
-    urbi->devent_urb.status = vdp_usb_urb_status_undefined;
+    urbi->devent_urb.status = vdphci_urb_status_unprocessed;
     urbi->devent_urb.actual_length = 0;
 }
 
@@ -201,7 +202,7 @@ static vdp_usb_result urbi_create_in_iso(struct vdp_usb_device* device,
      */
 
     for (i = 0; i < num_iso_packets; ++i) {
-        (*urbi)->devent_urb.data.packets[i].status = vdp_usb_urb_status_undefined;
+        (*urbi)->devent_urb.data.packets[i].status = vdphci_urb_status_unprocessed;
         (*urbi)->devent_urb.data.packets[i].actual_length = 0;
     }
 
@@ -234,7 +235,7 @@ static vdp_usb_result urbi_create_in_control(struct vdp_usb_device* device,
 
     setup = (const struct vdp_usb_control_setup*)(&urb->data.buff[0]);
 
-    if ((vdp_u32)setup->wLength != urb->transfer_length) {
+    if ((vdp_u32)vdp_u16le_to_cpu(setup->wLength) != urb->transfer_length) {
         VDP_USB_LOG_ERROR(device->context,
             "device %d: bad urb size, control setup wLength != transfer_length",
             device->device_number);
@@ -442,7 +443,7 @@ static vdp_usb_result urbi_create_out_iso(struct vdp_usb_device* device,
      */
 
     for (i = 0; i < urb->number_of_packets; ++i) {
-        (*urbi)->devent_urb.data.packets[i].status = vdp_usb_urb_status_undefined;
+        (*urbi)->devent_urb.data.packets[i].status = vdphci_urb_status_unprocessed;
         (*urbi)->devent_urb.data.packets[i].actual_length = 0;
     }
 
@@ -486,7 +487,7 @@ static vdp_usb_result urbi_create_out_control(struct vdp_usb_device* device,
 
     setup = (const struct vdp_usb_control_setup*)(&urb->data.buff[0]);
 
-    if ((vdp_u32)setup->wLength != urb->transfer_length) {
+    if ((vdp_u32)vdp_u16le_to_cpu(setup->wLength) != urb->transfer_length) {
         VDP_USB_LOG_ERROR(device->context,
             "device %d: bad urb size, control setup wLength != transfer_length",
             device->device_number);
@@ -731,9 +732,8 @@ vdp_u32 vdp_usb_urbi_get_effective_size(struct vdp_usb_urbi* urbi)
         switch (original_urb->type) {
         case vdphci_urb_type_control:
         case vdphci_urb_type_bulk:
-        case vdphci_urb_type_int: {
+        case vdphci_urb_type_int:
             return urbi->size - (original_urb->transfer_length - urbi->devent_urb.actual_length);
-        }
         default:
             return urbi->size;
         }

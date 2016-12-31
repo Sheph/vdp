@@ -26,6 +26,8 @@ typedef uint64_t vdp_u64;
 
 typedef vdp_u8 vdp_byte;
 
+typedef uintptr_t vdp_uintptr;
+
 #ifdef linux
 typedef int vdp_fd;
 #else

@@ -1,5 +1,5 @@
 #include "vdp/usb.h"
-#include "vdp_usb_urbi.h"
+#include "vdp/byte_order.h"
 #include <stdlib.h>
 #include <assert.h>
 
@@ -141,9 +141,9 @@ void vdp_usb_urb_to_str(const struct vdp_usb_urb* urb, char* buff, size_t buff_s
             vdp_usb_request_type_type_to_str(urb->setup_packet->bRequestType),
             vdp_usb_request_type_recipient_to_str(urb->setup_packet->bRequestType),
             vdp_usb_request_to_str(urb->setup_packet->bRequest),
-            urb->setup_packet->wValue,
-            urb->setup_packet->wIndex,
-            urb->setup_packet->wLength);
+            vdp_u16le_to_cpu(urb->setup_packet->wValue),
+            vdp_u16le_to_cpu(urb->setup_packet->wIndex),
+            vdp_u16le_to_cpu(urb->setup_packet->wLength));
     } else {
         ret = snprintf(
             buff,
@@ -161,18 +161,4 @@ void vdp_usb_urb_to_str(const struct vdp_usb_urb* urb, char* buff, size_t buff_s
     } else {
         buff[buff_size - 1] = '\0';
     }
-}
-
-void vdp_usb_free_urb(struct vdp_usb_urb* urb)
-{
-    struct vdp_usb_urbi* urbi;
-
-    assert(urb);
-    if (!urb) {
-        return;
-    }
-
-    urbi = vdp_containerof(urb, struct vdp_usb_urbi, urb);
-
-    vdp_usb_urbi_destroy(urbi);
 }

@@ -26,7 +26,7 @@ void vdphci_direct_write_end(struct page** pages, int num_pages);
  * @{
  */
 
-int vdphci_direct_read(char* dst, size_t count, size_t offset, const char __user* buf, struct page** pages);
+int vdphci_direct_read(void* dst, size_t count, size_t offset, const char __user* buf, struct page** pages);
 
 int vdphci_direct_write(size_t offset, size_t count, const void* src, char __user* buf, struct page** pages);
 

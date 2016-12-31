@@ -72,7 +72,7 @@ void vdphci_direct_write_end(struct page** pages, int num_pages)
     vdphci_direct_io_end(pages, num_pages, 1);
 }
 
-int vdphci_direct_read(char* dst, size_t count, size_t offset, const char __user* buf, struct page** pages)
+int vdphci_direct_read(void* dst, size_t count, size_t offset, const char __user* buf, struct page** pages)
 {
     size_t start_offset = (unsigned long)buf & (PAGE_SIZE - 1);
 

@@ -7,6 +7,8 @@ set(SRC
     vdp_usb_urbi.c
     vdp_usb_urbi.h
     vdp_usb_util.c
+    vdp_usb_filter.c
+    vdp_usb_gadget.c
 )
 
 add_library(vdpusb STATIC ${SRC})

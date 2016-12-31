@@ -1,4 +1,6 @@
 #include "vdp/usb.h"
+#include "vdp/usb_filter.h"
+#include "vdp/byte_order.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,6 +22,36 @@ static void print_error(vdp_usb_result res, const char* fmt, ...)
         printf("error: %s\n", vdp_usb_result_to_str(res));
     }
 }
+
+static vdp_usb_urb_status test_get_device_descriptor(void* user_data,
+    struct vdp_usb_device_descriptor* descriptor)
+{
+    int device_num = (vdp_uintptr)user_data;
+
+    printf("get_device_descriptor on device #%d\n", device_num);
+
+    descriptor->bLength = sizeof(*descriptor);
+    descriptor->bDescriptorType = VDP_USB_DT_DEVICE;
+    descriptor->bcdUSB = vdp_cpu_to_u16le(0x0200);
+    descriptor->bDeviceClass = 0;
+    descriptor->bDeviceSubClass = 0;
+    descriptor->bDeviceProtocol = 0;
+    descriptor->bMaxPacketSize0 = 64;
+    descriptor->idVendor = vdp_cpu_to_u16le(0x046d);
+    descriptor->idProduct = vdp_cpu_to_u16le(0xc051);
+    descriptor->bcdDevice = vdp_cpu_to_u16le(0x3000);
+    descriptor->iManufacturer = 1;
+    descriptor->iProduct = 2;
+    descriptor->iSerialNumber = 0;
+    descriptor->bNumConfigurations = 1;
+
+    return vdp_usb_urb_status_completed;
+}
+
+static struct vdp_usb_filter_ops test_filter_ops =
+{
+    .get_device_descriptor = test_get_device_descriptor
+};
 
 static int cmd_dump_events(char* argv[])
 {
@@ -112,7 +144,9 @@ static int cmd_dump_events(char* argv[])
             vdp_usb_urb_to_str(event.data.urb, urb_str, sizeof(urb_str));
 
             printf("event on device #%d: urb %s\n", device_num, &urb_str[0]);
-            event.data.urb->status = vdp_usb_urb_status_completed;
+            if (!vdp_usb_filter(event.data.urb, &test_filter_ops, (void*)(vdp_uintptr)device_num)) {
+                event.data.urb->status = vdp_usb_urb_status_completed;
+            }
             vdp_usb_complete_urb(event.data.urb);
             vdp_usb_free_urb(event.data.urb);
             break;
