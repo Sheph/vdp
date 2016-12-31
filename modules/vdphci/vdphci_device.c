@@ -214,6 +214,29 @@ static int vdphci_device_write_in_control_urb(const struct vdphci_devent_urb* ur
     return 0;
 }
 
+static int vdphci_device_write_out_control_urb(const struct vdphci_devent_urb* urb_devent,
+    struct urb* urb,
+    const char __user* buf,
+    struct page** pages,
+    size_t count)
+{
+    if (urb_devent->actual_length > urb->transfer_buffer_length) {
+        return -EINVAL;
+    }
+
+    if (count != 0) {
+        return -EINVAL;
+    }
+
+    if (!vdphci_device_translate_urb_status(urb_devent->status, &urb->status)) {
+        return -EINVAL;
+    }
+
+    urb->actual_length = urb_devent->actual_length;
+
+    return 0;
+}
+
 /*
  * @}
  */
@@ -271,8 +294,23 @@ static int vdphci_device_process_urb_devent(struct vdphci_device* device, const 
             retval = 0;
         }
     } else {
-        urb_khevent->urb->status = -EPROTO;
-        retval = 0;
+        switch (usb_pipetype(urb_khevent->urb->pipe)) {
+        case PIPE_CONTROL: {
+            retval = vdphci_device_write_out_control_urb(&urb_devent,
+                urb_khevent->urb,
+                buf,
+                pages,
+                event_data_size);
+            break;
+        }
+        case PIPE_BULK:
+        case PIPE_INTERRUPT:
+        case PIPE_ISOCHRONOUS:
+        default:
+            print_error("Bad URB pipe type: %d\n", usb_pipetype(urb_khevent->urb->pipe));
+            urb_khevent->urb->status = -EPROTO;
+            retval = 0;
+        }
     }
 
     if (retval >= 0) {
@@ -444,6 +482,53 @@ static int vdphci_device_read_in_control_urb(
     return data_size;
 }
 
+static int vdphci_device_read_out_control_urb(
+    u32 seq_num,
+    struct urb* urb,
+    char __user* buf,
+    struct page** pages,
+    size_t count)
+{
+    int retval = 0;
+    size_t data_size = offsetof(struct vdphci_hevent_urb, data.buff) +
+        sizeof(struct usb_ctrlrequest) + urb->transfer_buffer_length;
+
+    if (count < data_size) {
+        return data_size;
+    }
+
+    retval = vdphci_urb_hevent_write_common(seq_num, urb, buf, pages);
+
+    if (retval != 0) {
+        return retval;
+    }
+
+    retval = vdphci_direct_write(sizeof(struct vdphci_hevent_header) +
+        offsetof(struct vdphci_hevent_urb, data.buff),
+        sizeof(struct usb_ctrlrequest),
+        urb->setup_packet,
+        buf,
+        pages);
+
+    if (retval != 0) {
+        return retval;
+    }
+
+    retval = vdphci_direct_write(sizeof(struct vdphci_hevent_header) +
+        offsetof(struct vdphci_hevent_urb, data.buff) +
+        sizeof(struct usb_ctrlrequest),
+        urb->transfer_buffer_length,
+        urb->transfer_buffer,
+        buf,
+        pages);
+
+    if (retval != 0) {
+        return retval;
+    }
+
+    return data_size;
+}
+
 /*
  * @}
  */
@@ -479,7 +564,22 @@ static int vdphci_device_process_urb_hevent(
             retval = -EIO;
         }
     } else {
-        retval = -EIO;
+        switch (usb_pipetype(event->urb->pipe)) {
+        case PIPE_CONTROL: {
+            retval = vdphci_device_read_out_control_urb(event->seq_num,
+                event->urb,
+                buf,
+                pages,
+                event_data_size);
+            break;
+        }
+        case PIPE_BULK:
+        case PIPE_INTERRUPT:
+        case PIPE_ISOCHRONOUS:
+        default:
+            print_error("Bad URB pipe type: %d\n", usb_pipetype(event->urb->pipe));
+            retval = -EIO;
+        }
     }
 
     if (retval < 0) {

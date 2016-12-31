@@ -11,6 +11,9 @@ struct vdp_usb_filter_ops
 {
     vdp_usb_urb_status (*get_device_descriptor)(void* /*user_data*/,
         struct vdp_usb_device_descriptor* /*descriptor*/);
+
+    vdp_usb_urb_status (*set_address)(void* /*user_data*/,
+        vdp_u16 /*address*/);
 };
 
 /*

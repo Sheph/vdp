@@ -48,9 +48,20 @@ static vdp_usb_urb_status test_get_device_descriptor(void* user_data,
     return vdp_usb_urb_status_completed;
 }
 
+static vdp_usb_urb_status test_set_address(void* user_data,
+    vdp_u16 address)
+{
+    int device_num = (vdp_uintptr)user_data;
+
+    printf("set_address(%d) on device #%d\n", (int)address, device_num);
+
+    return vdp_usb_urb_status_completed;
+}
+
 static struct vdp_usb_filter_ops test_filter_ops =
 {
-    .get_device_descriptor = test_get_device_descriptor
+    .get_device_descriptor = test_get_device_descriptor,
+    .set_address = test_set_address
 };
 
 static int cmd_dump_events(char* argv[])
