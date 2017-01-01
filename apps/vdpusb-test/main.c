@@ -54,6 +54,19 @@ static const struct vdp_usb_descriptor_header *test_descriptors[] =
     NULL,
 };
 
+static const struct vdp_usb_string test_us_strings[] =
+{
+    {1, "Logitech"},
+    {2, "USB-PS/2 Optical Mouse"},
+    {0, NULL},
+};
+
+static const struct vdp_usb_string_table test_string_tables[] =
+{
+    {0x0409, test_us_strings},
+    {0, NULL},
+};
+
 static vdp_usb_urb_status test_get_device_descriptor(void* user_data,
     struct vdp_usb_device_descriptor* descriptor)
 {
@@ -75,6 +88,26 @@ static vdp_usb_urb_status test_get_device_descriptor(void* user_data,
     descriptor->iProduct = 2;
     descriptor->iSerialNumber = 0;
     descriptor->bNumConfigurations = 1;
+
+    return vdp_usb_urb_status_completed;
+}
+
+static vdp_usb_urb_status test_get_qualifier_descriptor(void* user_data,
+    struct vdp_usb_qualifier_descriptor* descriptor)
+{
+    int device_num = (vdp_uintptr)user_data;
+
+    printf("get_qualifier_descriptor on device #%d\n", device_num);
+
+    descriptor->bLength = sizeof(*descriptor);
+    descriptor->bDescriptorType = VDP_USB_DT_QUALIFIER;
+    descriptor->bcdUSB = vdp_cpu_to_u16le(0x0200);
+    descriptor->bDeviceClass = 0;
+    descriptor->bDeviceSubClass = 0;
+    descriptor->bDeviceProtocol = 0;
+    descriptor->bMaxPacketSize0 = 64;
+    descriptor->bNumConfigurations = 1;
+    descriptor->bRESERVED = 0;
 
     return vdp_usb_urb_status_completed;
 }
@@ -101,22 +134,14 @@ static vdp_usb_urb_status test_get_config_descriptor(void* user_data,
     return vdp_usb_urb_status_completed;
 }
 
-static vdp_usb_urb_status test_get_qualifier_descriptor(void* user_data,
-    struct vdp_usb_qualifier_descriptor* descriptor)
+static vdp_usb_urb_status test_get_string_descriptor(void* user_data,
+    const struct vdp_usb_string_table** tables)
 {
     int device_num = (vdp_uintptr)user_data;
 
-    printf("get_qualifier_descriptor on device #%d\n", device_num);
+    printf("get_string_descriptor on device #%d\n", device_num);
 
-    descriptor->bLength = sizeof(*descriptor);
-    descriptor->bDescriptorType = VDP_USB_DT_QUALIFIER;
-    descriptor->bcdUSB = vdp_cpu_to_u16le(0x0200);
-    descriptor->bDeviceClass = 0;
-    descriptor->bDeviceSubClass = 0;
-    descriptor->bDeviceProtocol = 0;
-    descriptor->bMaxPacketSize0 = 64;
-    descriptor->bNumConfigurations = 1;
-    descriptor->bRESERVED = 0;
+    *tables = test_string_tables;
 
     return vdp_usb_urb_status_completed;
 }
@@ -134,8 +159,9 @@ static vdp_usb_urb_status test_set_address(void* user_data,
 static struct vdp_usb_filter_ops test_filter_ops =
 {
     .get_device_descriptor = test_get_device_descriptor,
-    .get_config_descriptor = test_get_config_descriptor,
     .get_qualifier_descriptor = test_get_qualifier_descriptor,
+    .get_config_descriptor = test_get_config_descriptor,
+    .get_string_descriptor = test_get_string_descriptor,
     .set_address = test_set_address
 };
 

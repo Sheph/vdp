@@ -77,9 +77,8 @@ vdp_u32 vdp_usb_write_string_descriptor(const struct vdp_usb_string_table* table
     vdp_u32 tmp = 0;
     vdp_u32 num_written = 0;
     const struct vdp_usb_string_table* table = NULL;
-    struct vdp_usb_string* string = NULL;
+    const struct vdp_usb_string* string = NULL;
 
-    assert(tables);
     if (!tables) {
         return 0;
     }

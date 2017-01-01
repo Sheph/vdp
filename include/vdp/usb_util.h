@@ -140,7 +140,7 @@ struct vdp_usb_string
 struct vdp_usb_string_table
 {
     vdp_u16 language_id; /* in host byte order */
-    struct vdp_usb_string* strings; /* string array terminated by {0, NULL} entry */
+    const struct vdp_usb_string* strings; /* string array terminated by {0, NULL} entry */
 };
 
 /*

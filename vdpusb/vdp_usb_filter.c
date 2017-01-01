@@ -59,8 +59,19 @@ int vdp_usb_filter(struct vdp_usb_urb* urb, struct vdp_usb_filter_ops* ops,
                 return 1;
             }
             break;
-        case VDP_USB_DT_STRING:
-            break;
+        case VDP_USB_DT_STRING: {
+            const struct vdp_usb_string_table* tables = NULL;
+
+            urb->status = ops->get_string_descriptor(user_data, &tables);
+            if (urb->status == vdp_usb_urb_status_completed) {
+                urb->actual_length = vdp_usb_write_string_descriptor(tables,
+                    vdp_u16le_to_cpu(urb->setup_packet->wIndex),
+                    dt_index,
+                    urb->transfer_buffer,
+                    urb->transfer_length);
+            }
+            return 1;
+        }
         case VDP_USB_DT_QUALIFIER:
             if ((dt_index == 0) && (urb->setup_packet->wIndex == 0)) {
                 struct vdp_usb_qualifier_descriptor descriptor;
