@@ -13,33 +13,20 @@ extern "C" {
  * @{
  */
 
-#define VDP_USB_DT_DEVICE    0x01
-#define VDP_USB_DT_CONFIG    0x02
-#define VDP_USB_DT_STRING    0x03
-#define VDP_USB_DT_INTERFACE 0x04
-#define VDP_USB_DT_ENDPOINT  0x05
-
-#define VDP_USB_CLASS_PER_INTERFACE          0 /* for DeviceClass */
-#define VDP_USB_CLASS_AUDIO                  1
-#define VDP_USB_CLASS_COMM                   2
-#define VDP_USB_CLASS_HID                    3
-#define VDP_USB_CLASS_PHYSICAL               5
-#define VDP_USB_CLASS_STILL_IMAGE            6
-#define VDP_USB_CLASS_PRINTER                7
-#define VDP_USB_CLASS_MASS_STORAGE           8
-#define VDP_USB_CLASS_HUB                    9
-#define VDP_USB_CLASS_CDC_DATA            0x0a
-#define VDP_USB_CLASS_CSCID               0x0b /* chip+ smart card */
-#define VDP_USB_CLASS_CONTENT_SEC         0x0d /* content security */
-#define VDP_USB_CLASS_VIDEO               0x0e
-#define VDP_USB_CLASS_WIRELESS_CONTROLLER 0xe0
-#define VDP_USB_CLASS_MISC                0xef
-#define VDP_USB_CLASS_APP_SPEC            0xfe
-#define VDP_USB_CLASS_VENDOR_SPEC         0xff
-
-#define VDP_USB_SUBCLASS_VENDOR_SPEC      0xff
+#define VDP_USB_DT_DEVICE           0x01
+#define VDP_USB_DT_CONFIG           0x02
+#define VDP_USB_DT_STRING           0x03
+#define VDP_USB_DT_INTERFACE        0x04
+#define VDP_USB_DT_ENDPOINT         0x05
+#define VDP_USB_DT_QUALIFIER        0x06
 
 #pragma pack(1)
+struct vdp_usb_descriptor_header
+{
+    vdp_u8 bLength;
+    vdp_u8 bDescriptorType;
+};
+
 struct vdp_usb_device_descriptor
 {
     vdp_u8 bLength;
@@ -88,9 +75,6 @@ struct vdp_usb_interface_descriptor
     vdp_u8 iInterface;
 };
 
-#define VDP_USB_DT_ENDPOINT_SIZE       7
-#define VDP_USB_DT_ENDPOINT_AUDIO_SIZE 9 /* Audio extension */
-
 #define VDP_USB_ENDPOINT_SYNC_NONE     (0 << 2)
 #define VDP_USB_ENDPOINT_SYNC_ASYNC    (1 << 2)
 #define VDP_USB_ENDPOINT_SYNC_ADAPTIVE (2 << 2)
@@ -100,6 +84,9 @@ struct vdp_usb_interface_descriptor
 #define VDP_USB_ENDPOINT_XFER_ISO      1
 #define VDP_USB_ENDPOINT_XFER_BULK     2
 #define VDP_USB_ENDPOINT_XFER_INT      3
+
+#define VDP_USB_ENDPOINT_IN_ADDRESS(number) (((number) & 0x7F) | 0x80)
+#define VDP_USB_ENDPOINT_OUT_ADDRESS(number) (((number) & 0x7F) | 0x00)
 
 struct vdp_usb_endpoint_descriptor
 {
@@ -112,11 +99,23 @@ struct vdp_usb_endpoint_descriptor
 
     /*
      * NOTE: These two are ONLY in audio endpoints.
-     * Use VDP_USB_DT_ENDPOINT*_SIZE in bLength, not sizeof.
      */
 
     vdp_u8 bRefresh;
     vdp_u8 bSynchAddress;
+};
+
+struct vdp_usb_qualifier_descriptor
+{
+    vdp_u8 bLength;
+    vdp_u8 bDescriptorType;
+    vdp_u16 bcdUSB;
+    vdp_u8 bDeviceClass;
+    vdp_u8 bDeviceSubClass;
+    vdp_u8 bDeviceProtocol;
+    vdp_u8 bMaxPacketSize0;
+    vdp_u8 bNumConfigurations;
+    vdp_u8 bRESERVED;
 };
 
 struct vdp_usb_string_descriptor
@@ -177,26 +176,20 @@ vdp_u32 vdp_usb_write_device_descriptor(
     vdp_u32 buff_size);
 
 /*
+ * descriptor.wTotalLength will be calculated automatically.
  * Returns number of bytes written.
  */
 vdp_u32 vdp_usb_write_config_descriptor(
     const struct vdp_usb_config_descriptor* descriptor,
+    const struct vdp_usb_descriptor_header** other,
     vdp_byte* buff,
     vdp_u32 buff_size);
 
 /*
  * Returns number of bytes written.
  */
-vdp_u32 vdp_usb_write_interface_descriptor(
-    const struct vdp_usb_interface_descriptor* descriptor,
-    vdp_byte* buff,
-    vdp_u32 buff_size);
-
-/*
- * Returns number of bytes written.
- */
-vdp_u32 vdp_usb_write_endpoint_descriptor(
-    const struct vdp_usb_endpoint_descriptor* descriptor,
+vdp_u32 vdp_usb_write_qualifier_descriptor(
+    const struct vdp_usb_qualifier_descriptor* descriptor,
     vdp_byte* buff,
     vdp_u32 buff_size);
 

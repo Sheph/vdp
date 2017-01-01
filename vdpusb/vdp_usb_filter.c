@@ -45,12 +45,34 @@ int vdp_usb_filter(struct vdp_usb_urb* urb, struct vdp_usb_filter_ops* ops,
             }
             break;
         case VDP_USB_DT_CONFIG:
+            if (urb->setup_packet->wIndex == 0) {
+                struct vdp_usb_config_descriptor descriptor;
+                const struct vdp_usb_descriptor_header** other = NULL;
+                memset(&descriptor, 0, sizeof(descriptor));
+                urb->status = ops->get_config_descriptor(user_data, dt_index, &descriptor, &other);
+                if (urb->status == vdp_usb_urb_status_completed) {
+                    urb->actual_length = vdp_usb_write_config_descriptor(&descriptor,
+                        other,
+                        urb->transfer_buffer,
+                        urb->transfer_length);
+                }
+                return 1;
+            }
             break;
         case VDP_USB_DT_STRING:
             break;
-        case VDP_USB_DT_INTERFACE:
-            break;
-        case VDP_USB_DT_ENDPOINT:
+        case VDP_USB_DT_QUALIFIER:
+            if ((dt_index == 0) && (urb->setup_packet->wIndex == 0)) {
+                struct vdp_usb_qualifier_descriptor descriptor;
+                memset(&descriptor, 0, sizeof(descriptor));
+                urb->status = ops->get_qualifier_descriptor(user_data, &descriptor);
+                if (urb->status == vdp_usb_urb_status_completed) {
+                    urb->actual_length = vdp_usb_write_qualifier_descriptor(&descriptor,
+                        urb->transfer_buffer,
+                        urb->transfer_length);
+                }
+                return 1;
+            }
             break;
         default:
             break;

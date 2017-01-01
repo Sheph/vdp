@@ -1,5 +1,6 @@
 #include "vdp/usb.h"
 #include "vdp/usb_filter.h"
+#include "vdp/usb_hid.h"
 #include "vdp/byte_order.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +23,36 @@ static void print_error(vdp_usb_result res, const char* fmt, ...)
         printf("error: %s\n", vdp_usb_result_to_str(res));
     }
 }
+
+static struct vdp_usb_interface_descriptor test_interface_descriptor =
+{
+    .bLength = sizeof(struct vdp_usb_interface_descriptor),
+    .bDescriptorType = VDP_USB_DT_INTERFACE,
+    .bInterfaceNumber = 0,
+    .bAlternateSetting = 0,
+    .bNumEndpoints = 1,
+    .bInterfaceClass = VDP_USB_CLASS_HID,
+    .bInterfaceSubClass = VDP_USB_SUBCLASS_BOOT,
+    .bInterfaceProtocol = VDP_USB_PROTOCOL_MOUSE,
+    .iInterface = 0
+};
+
+static struct vdp_usb_endpoint_descriptor test_endpoint_descriptor =
+{
+    .bLength = sizeof(struct vdp_usb_endpoint_descriptor),
+    .bDescriptorType = VDP_USB_DT_ENDPOINT,
+    .bEndpointAddress = VDP_USB_ENDPOINT_IN_ADDRESS(1),
+    .bmAttributes = VDP_USB_ENDPOINT_XFER_INT,
+    .wMaxPacketSize = 8,
+    .bInterval = 10
+};
+
+static const struct vdp_usb_descriptor_header *test_descriptors[] =
+{
+    (const struct vdp_usb_descriptor_header *)&test_interface_descriptor,
+    (const struct vdp_usb_descriptor_header *)&test_endpoint_descriptor,
+    NULL,
+};
 
 static vdp_usb_urb_status test_get_device_descriptor(void* user_data,
     struct vdp_usb_device_descriptor* descriptor)
@@ -48,6 +79,48 @@ static vdp_usb_urb_status test_get_device_descriptor(void* user_data,
     return vdp_usb_urb_status_completed;
 }
 
+static vdp_usb_urb_status test_get_config_descriptor(void* user_data,
+    vdp_u8 index,
+    struct vdp_usb_config_descriptor* descriptor,
+    const struct vdp_usb_descriptor_header*** other)
+{
+    int device_num = (vdp_uintptr)user_data;
+
+    printf("get_config_descriptor on device #%d\n", device_num);
+
+    descriptor->bLength = sizeof(*descriptor);
+    descriptor->bDescriptorType = VDP_USB_DT_CONFIG;
+    descriptor->bNumInterfaces = 1;
+    descriptor->bConfigurationValue = 1;
+    descriptor->iConfiguration = 0;
+    descriptor->bmAttributes = VDP_USB_CONFIG_ATT_ONE | VDP_USB_CONFIG_ATT_WAKEUP;
+    descriptor->bMaxPower = 49;
+
+    *other = test_descriptors;
+
+    return vdp_usb_urb_status_completed;
+}
+
+static vdp_usb_urb_status test_get_qualifier_descriptor(void* user_data,
+    struct vdp_usb_qualifier_descriptor* descriptor)
+{
+    int device_num = (vdp_uintptr)user_data;
+
+    printf("get_qualifier_descriptor on device #%d\n", device_num);
+
+    descriptor->bLength = sizeof(*descriptor);
+    descriptor->bDescriptorType = VDP_USB_DT_QUALIFIER;
+    descriptor->bcdUSB = vdp_cpu_to_u16le(0x0200);
+    descriptor->bDeviceClass = 0;
+    descriptor->bDeviceSubClass = 0;
+    descriptor->bDeviceProtocol = 0;
+    descriptor->bMaxPacketSize0 = 64;
+    descriptor->bNumConfigurations = 1;
+    descriptor->bRESERVED = 0;
+
+    return vdp_usb_urb_status_completed;
+}
+
 static vdp_usb_urb_status test_set_address(void* user_data,
     vdp_u16 address)
 {
@@ -61,6 +134,8 @@ static vdp_usb_urb_status test_set_address(void* user_data,
 static struct vdp_usb_filter_ops test_filter_ops =
 {
     .get_device_descriptor = test_get_device_descriptor,
+    .get_config_descriptor = test_get_config_descriptor,
+    .get_qualifier_descriptor = test_get_qualifier_descriptor,
     .set_address = test_set_address
 };
 

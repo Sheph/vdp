@@ -180,7 +180,12 @@ vdp_u32 vdp_usb_write_device_descriptor(
         return 0;
     }
 
-    tmp = vdp_min(sizeof(*descriptor), buff_size);
+    assert(descriptor->bLength <= sizeof(*descriptor));
+    if (descriptor->bLength > sizeof(*descriptor)) {
+        return 0;
+    }
+
+    tmp = vdp_min(descriptor->bLength, buff_size);
 
     memcpy(buff, descriptor, tmp);
 
@@ -189,44 +194,61 @@ vdp_u32 vdp_usb_write_device_descriptor(
 
 vdp_u32 vdp_usb_write_config_descriptor(
     const struct vdp_usb_config_descriptor* descriptor,
+    const struct vdp_usb_descriptor_header** other,
     vdp_byte* buff,
     vdp_u32 buff_size)
 {
     vdp_u32 tmp;
+    const struct vdp_usb_descriptor_header** iter;
+    vdp_u32 total;
+    struct vdp_usb_config_descriptor tmp_descriptor;
 
     assert(descriptor);
+
     if (!descriptor) {
         return 0;
     }
 
-    tmp = vdp_min(sizeof(*descriptor), buff_size);
-
-    memcpy(buff, descriptor, tmp);
-
-    return tmp;
-}
-
-vdp_u32 vdp_usb_write_interface_descriptor(
-    const struct vdp_usb_interface_descriptor* descriptor,
-    vdp_byte* buff,
-    vdp_u32 buff_size)
-{
-    vdp_u32 tmp;
-
-    assert(descriptor);
-    if (!descriptor) {
+    assert(descriptor->bLength <= sizeof(*descriptor));
+    if (descriptor->bLength > sizeof(*descriptor)) {
         return 0;
     }
 
-    tmp = vdp_min(sizeof(*descriptor), buff_size);
+    memcpy(&tmp_descriptor, descriptor, sizeof(tmp_descriptor));
 
-    memcpy(buff, descriptor, tmp);
+    total = tmp_descriptor.bLength;
 
-    return tmp;
+    for (iter = other; iter && (*iter != NULL); ++iter) {
+        total += (*iter)->bLength;
+    }
+
+    tmp_descriptor.wTotalLength = vdp_cpu_to_u16le(total);
+
+    tmp = vdp_min(tmp_descriptor.bLength, buff_size);
+
+    memcpy(buff, &tmp_descriptor, tmp);
+
+    buff += tmp;
+    buff_size -= tmp;
+    iter = other;
+    total = tmp;
+
+    while ((buff_size > 0) && iter && *iter) {
+        tmp = vdp_min((*iter)->bLength, buff_size);
+
+        memcpy(buff, *iter, tmp);
+
+        buff += tmp;
+        buff_size -= tmp;
+        ++iter;
+        total += tmp;
+    }
+
+    return total;
 }
 
-vdp_u32 vdp_usb_write_endpoint_descriptor(
-    const struct vdp_usb_endpoint_descriptor* descriptor,
+vdp_u32 vdp_usb_write_qualifier_descriptor(
+    const struct vdp_usb_qualifier_descriptor* descriptor,
     vdp_byte* buff,
     vdp_u32 buff_size)
 {
