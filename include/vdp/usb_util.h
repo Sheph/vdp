@@ -75,6 +75,9 @@ struct vdp_usb_interface_descriptor
     vdp_u8 iInterface;
 };
 
+#define VDP_USB_DT_ENDPOINT_SIZE       7
+#define VDP_USB_DT_ENDPOINT_AUDIO_SIZE 9 /* Audio extension */
+
 #define VDP_USB_ENDPOINT_SYNC_NONE     (0 << 2)
 #define VDP_USB_ENDPOINT_SYNC_ASYNC    (1 << 2)
 #define VDP_USB_ENDPOINT_SYNC_ADAPTIVE (2 << 2)
@@ -99,6 +102,7 @@ struct vdp_usb_endpoint_descriptor
 
     /*
      * NOTE: These two are ONLY in audio endpoints.
+     * Use VDP_USB_DT_ENDPOINT*_SIZE in bLength, not sizeof.
      */
 
     vdp_u8 bRefresh;

@@ -85,7 +85,7 @@ static const struct vdp_usb_hid_descriptor test_hid_descriptor =
 {
     .bLength = sizeof(struct vdp_usb_hid_descriptor),
     .bDescriptorType = VDP_USB_HID_DT_HID,
-    .bcdHID = 0x0101,
+    .bcdHID = 0x0110,
     .bCountryCode = 0,
     .bNumDescriptors = 1,
     .desc[0].bDescriptorType = VDP_USB_HID_DT_REPORT,
@@ -94,7 +94,7 @@ static const struct vdp_usb_hid_descriptor test_hid_descriptor =
 
 static const struct vdp_usb_endpoint_descriptor test_endpoint_descriptor =
 {
-    .bLength = sizeof(struct vdp_usb_endpoint_descriptor),
+    .bLength = VDP_USB_DT_ENDPOINT_SIZE,
     .bDescriptorType = VDP_USB_DT_ENDPOINT,
     .bEndpointAddress = VDP_USB_ENDPOINT_IN_ADDRESS(1),
     .bmAttributes = VDP_USB_ENDPOINT_XFER_INT,

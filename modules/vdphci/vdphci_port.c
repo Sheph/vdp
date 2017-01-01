@@ -96,7 +96,7 @@ static void vdphci_port_khevent_signal_enqueue(struct vdphci_port* port,
     INIT_LIST_HEAD(&event->list);
     event->signal = hsignal;
 
-    list_add_tail(&port->signal_list, &event->list);
+    list_add_tail(&event->list, &port->signal_list);
 
     wake_up(&port->khevent_wq);
 }
@@ -149,7 +149,7 @@ static void vdphci_port_khevent_urb_dequeue(struct vdphci_port* port,
     INIT_LIST_HEAD(&unlink_urb_event->list);
     unlink_urb_event->khevent_urb = event;
 
-    list_add_tail(&port->unlink_urb_list, &unlink_urb_event->list);
+    list_add_tail(&unlink_urb_event->list, &port->unlink_urb_list);
 
     event->khevent_unlink_urb = unlink_urb_event;
 
@@ -299,7 +299,7 @@ int vdphci_port_urb_enqueue(struct vdphci_port* port, struct urb* urb, u32* seq_
     event->urb = urb;
     urb->hcpriv = event;
 
-    list_add_tail(&port->urb_list, &event->list);
+    list_add_tail(&event->list, &port->urb_list);
 
     if (!port->current_urb_khevent) {
         /*
@@ -445,7 +445,7 @@ void vdphci_port_update(struct vdphci_port* port, struct list_head* giveback_lis
     if ((port->status & USB_PORT_STAT_POWER) == 0) {
         port->status = 0;
     } else if (port->device_attached) {
-        port->status |= USB_PORT_STAT_CONNECTION;
+        port->status |= USB_PORT_STAT_CONNECTION | USB_PORT_STAT_HIGH_SPEED;
 
         if ((port->old_status & USB_PORT_STAT_CONNECTION) == 0) {
             port->status |= (USB_PORT_STAT_C_CONNECTION << 16);

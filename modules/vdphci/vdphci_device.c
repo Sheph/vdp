@@ -181,7 +181,7 @@ static int vdphci_device_process_signal_devent(struct vdphci_device* device, con
  * @{
  */
 
-static int vdphci_device_write_in_control_urb(const struct vdphci_devent_urb* urb_devent,
+static int vdphci_device_write_in_other_urb(const struct vdphci_devent_urb* urb_devent,
     struct urb* urb,
     const char __user* buf,
     struct page** pages,
@@ -277,16 +277,15 @@ static int vdphci_device_process_urb_devent(struct vdphci_device* device, const 
 
     if (usb_pipein(urb_khevent->urb->pipe)) {
         switch (usb_pipetype(urb_khevent->urb->pipe)) {
-        case PIPE_CONTROL: {
-            retval = vdphci_device_write_in_control_urb(&urb_devent,
+        case PIPE_CONTROL:
+        case PIPE_BULK:
+        case PIPE_INTERRUPT:
+            retval = vdphci_device_write_in_other_urb(&urb_devent,
                 urb_khevent->urb,
                 buf,
                 pages,
                 event_data_size);
             break;
-        }
-        case PIPE_BULK:
-        case PIPE_INTERRUPT:
         case PIPE_ISOCHRONOUS:
         default:
             print_error("Bad URB pipe type: %d\n", usb_pipetype(urb_khevent->urb->pipe));
@@ -482,6 +481,29 @@ static int vdphci_device_read_in_control_urb(
     return data_size;
 }
 
+static int vdphci_device_read_in_other_urb(
+    u32 seq_num,
+    struct urb* urb,
+    char __user* buf,
+    struct page** pages,
+    size_t count)
+{
+    int retval = 0;
+    size_t data_size = offsetof(struct vdphci_hevent_urb, data.buff);
+
+    if (count < data_size) {
+        return data_size;
+    }
+
+    retval = vdphci_urb_hevent_write_common(seq_num, urb, buf, pages);
+
+    if (retval != 0) {
+        return retval;
+    }
+
+    return data_size;
+}
+
 static int vdphci_device_read_out_control_urb(
     u32 seq_num,
     struct urb* urb,
@@ -558,6 +580,12 @@ static int vdphci_device_process_urb_hevent(
         }
         case PIPE_BULK:
         case PIPE_INTERRUPT:
+            retval = vdphci_device_read_in_other_urb(event->seq_num,
+                event->urb,
+                buf,
+                pages,
+                event_data_size);
+            break;
         case PIPE_ISOCHRONOUS:
         default:
             print_error("Bad URB pipe type: %d\n", usb_pipetype(event->urb->pipe));

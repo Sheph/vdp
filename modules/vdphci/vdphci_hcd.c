@@ -299,12 +299,16 @@ static int vdphci_urb_enqueue(struct usb_hcd* uhcd,
     ret = usb_hcd_link_urb_to_ep(uhcd, urb);
 
     if (ret != 0) {
+        print_error("%s: cannot link URB to EP: %d\n", uhcd->self.bus_name, ret);
+
         goto fail1;
     }
 
     ret = vdphci_port_urb_enqueue(port, urb, &seq_num);
 
     if (ret != 0) {
+        print_error("%s: cannot add URB to port: %d\n", uhcd->self.bus_name, ret);
+
         goto fail2;
     }
 
