@@ -7,7 +7,7 @@
 static int vdphci_direct_io_start(unsigned long start, size_t count, int write, struct page*** pages, int* num_pages)
 {
     int ret = 0;
-    *num_pages = (count + PAGE_SIZE - 1) >> PAGE_SHIFT;
+    *num_pages = PAGE_ALIGN((start & ~PAGE_MASK) + count) >> PAGE_SHIFT;
     *pages = kmalloc((*num_pages) * sizeof(struct page*), GFP_KERNEL);
 
     if (!(*pages)) {
@@ -22,7 +22,13 @@ static int vdphci_direct_io_start(unsigned long start, size_t count, int write, 
     up_read(&current->mm->mmap_sem);
 
     if (ret < (*num_pages)) {
+        int i;
+
+        for (i = 0; i < ret; ++i) {
+            put_page((*pages)[i]);
+        }
         kfree(*pages);
+
         return -ENOMEM;
     }
 
@@ -38,7 +44,7 @@ static void vdphci_direct_io_end(struct page** pages, int num_pages, int dirty)
             set_page_dirty_lock(pages[i]);
         }
 
-        page_cache_release(pages[i]);
+        put_page(pages[i]);
     }
 
     kfree(pages);
