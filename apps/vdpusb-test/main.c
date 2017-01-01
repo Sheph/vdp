@@ -24,7 +24,51 @@ static void print_error(vdp_usb_result res, const char* fmt, ...)
     }
 }
 
-static struct vdp_usb_interface_descriptor test_interface_descriptor =
+#pragma pack(1)
+static const vdp_u8 test_report_descriptor[] =
+{
+    0x05, 0x01,        // Usage Page (Generic Desktop Ctrls)
+    0x09, 0x02,        // Usage (Mouse)
+    0xA1, 0x01,        // Collection (Application)
+    0x09, 0x01,        //   Usage (Pointer)
+    0xA1, 0x00,        //   Collection (Physical)
+    0x05, 0x09,        //     Usage Page (Button)
+    0x19, 0x01,        //     Usage Minimum (0x01)
+    0x29, 0x08,        //     Usage Maximum (0x08)
+    0x15, 0x00,        //     Logical Minimum (0)
+    0x25, 0x01,        //     Logical Maximum (1)
+    0x95, 0x08,        //     Report Count (8)
+    0x75, 0x01,        //     Report Size (1)
+    0x81, 0x02,        //     Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+    0x95, 0x00,        //     Report Count (0)
+    0x81, 0x03,        //     Input (Const,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+    0x06, 0x00, 0xFF,  //     Usage Page (Vendor Defined 0xFF00)
+    0x09, 0x40,        //     Usage (0x40)
+    0x95, 0x02,        //     Report Count (2)
+    0x75, 0x08,        //     Report Size (8)
+    0x15, 0x81,        //     Logical Minimum (129)
+    0x25, 0x7F,        //     Logical Maximum (127)
+    0x81, 0x02,        //     Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+    0x05, 0x01,        //     Usage Page (Generic Desktop Ctrls)
+    0x09, 0x38,        //     Usage (Wheel)
+    0x15, 0x81,        //     Logical Minimum (129)
+    0x25, 0x7F,        //     Logical Maximum (127)
+    0x75, 0x08,        //     Report Size (8)
+    0x95, 0x01,        //     Report Count (1)
+    0x81, 0x06,        //     Input (Data,Var,Rel,No Wrap,Linear,Preferred State,No Null Position)
+    0x09, 0x30,        //     Usage (X)
+    0x09, 0x31,        //     Usage (Y)
+    0x16, 0x01, 0x80,  //     Logical Minimum (32769)
+    0x26, 0xFF, 0x7F,  //     Logical Maximum (32767)
+    0x75, 0x10,        //     Report Size (16)
+    0x95, 0x02,        //     Report Count (2)
+    0x81, 0x06,        //     Input (Data,Var,Rel,No Wrap,Linear,Preferred State,No Null Position)
+    0xC0,              //   End Collection
+    0xC0,              // End Collection
+};
+#pragma pack()
+
+static const struct vdp_usb_interface_descriptor test_interface_descriptor =
 {
     .bLength = sizeof(struct vdp_usb_interface_descriptor),
     .bDescriptorType = VDP_USB_DT_INTERFACE,
@@ -37,7 +81,18 @@ static struct vdp_usb_interface_descriptor test_interface_descriptor =
     .iInterface = 0
 };
 
-static struct vdp_usb_endpoint_descriptor test_endpoint_descriptor =
+static const struct vdp_usb_hid_descriptor test_hid_descriptor =
+{
+    .bLength = sizeof(struct vdp_usb_hid_descriptor),
+    .bDescriptorType = VDP_USB_HID_DT_HID,
+    .bcdHID = 0x0101,
+    .bCountryCode = 0,
+    .bNumDescriptors = 1,
+    .desc[0].bDescriptorType = VDP_USB_HID_DT_REPORT,
+    .desc[0].wDescriptorLength = sizeof(test_report_descriptor)
+};
+
+static const struct vdp_usb_endpoint_descriptor test_endpoint_descriptor =
 {
     .bLength = sizeof(struct vdp_usb_endpoint_descriptor),
     .bDescriptorType = VDP_USB_DT_ENDPOINT,
@@ -50,6 +105,7 @@ static struct vdp_usb_endpoint_descriptor test_endpoint_descriptor =
 static const struct vdp_usb_descriptor_header *test_descriptors[] =
 {
     (const struct vdp_usb_descriptor_header *)&test_interface_descriptor,
+    (const struct vdp_usb_descriptor_header *)&test_hid_descriptor,
     (const struct vdp_usb_descriptor_header *)&test_endpoint_descriptor,
     NULL,
 };

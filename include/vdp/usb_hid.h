@@ -29,6 +29,24 @@ extern "C" {
 #define VDP_USB_HID_DT_REPORT       0x22
 #define VDP_USB_HID_DT_PHYSICAL     0x23
 
+#pragma pack(1)
+struct vdp_usb_hid_class_descriptor
+{
+    vdp_u8 bDescriptorType;
+    vdp_u16 wDescriptorLength;
+};
+
+struct vdp_usb_hid_descriptor
+{
+    vdp_u8 bLength;
+    vdp_u8 bDescriptorType;
+    vdp_u16 bcdHID;
+    vdp_u8 bCountryCode;
+    vdp_u8 bNumDescriptors;
+    struct vdp_usb_hid_class_descriptor desc[1];
+};
+#pragma pack()
+
 /*
  * @}
  */
