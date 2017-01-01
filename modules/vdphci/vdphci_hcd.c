@@ -323,15 +323,27 @@ static int vdphci_urb_enqueue(struct usb_hcd* uhcd,
 
         BUG_ON(!req);
 
-        dprintk("%s: bmRequestType = %s:%s:%s, bRequest = %s, wValue = %d, wIndex = %d, buff = (%d)\n",
-            uhcd->self.bus_name,
-            vdphci_ctrl_request_type_direction_to_str(req->bRequestType),
-            vdphci_ctrl_request_type_type_to_str(req->bRequestType),
-            vdphci_ctrl_request_type_recipient_to_str(req->bRequestType),
-            vdphci_ctrl_request_to_str(req->bRequest),
-            le16_to_cpu(req->wValue),
-            le16_to_cpu(req->wIndex),
-            le16_to_cpu(req->wLength));
+        if ((req->bRequestType & USB_TYPE_MASK) == USB_TYPE_STANDARD) {
+            dprintk("%s: bmRequestType = %s:%s:%s, bRequest = %s, wValue = %d, wIndex = %d, buff = (%d)\n",
+                uhcd->self.bus_name,
+                vdphci_ctrl_request_type_direction_to_str(req->bRequestType),
+                vdphci_ctrl_request_type_type_to_str(req->bRequestType),
+                vdphci_ctrl_request_type_recipient_to_str(req->bRequestType),
+                vdphci_ctrl_request_to_str(req->bRequest),
+                le16_to_cpu(req->wValue),
+                le16_to_cpu(req->wIndex),
+                le16_to_cpu(req->wLength));
+        } else {
+            dprintk("%s: bmRequestType = %s:%s:%s, bRequest = 0x%X, wValue = %d, wIndex = %d, buff = (%d)\n",
+                uhcd->self.bus_name,
+                vdphci_ctrl_request_type_direction_to_str(req->bRequestType),
+                vdphci_ctrl_request_type_type_to_str(req->bRequestType),
+                vdphci_ctrl_request_type_recipient_to_str(req->bRequestType),
+                (int)req->bRequest,
+                le16_to_cpu(req->wValue),
+                le16_to_cpu(req->wIndex),
+                le16_to_cpu(req->wLength));
+        }
     }
 #endif
 

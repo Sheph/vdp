@@ -129,21 +129,39 @@ void vdp_usb_urb_to_str(const struct vdp_usb_urb* urb, char* buff, size_t buff_s
             urb->interval,
             urb->transfer_length);
     } else if (urb->type == vdp_usb_urb_control) {
-        ret = snprintf(
-            buff,
-            buff_size,
-            "id = %u, type = %s, flags = 0x%X, ep = 0x%.2X, bRequestType = %s:%s:%s, bRequest = %s, wValue = %u, wIndex = %u, buff = (%u)",
-            urb->id,
-            vdp_usb_urb_type_to_str(urb->type),
-            urb->flags,
-            urb->endpoint_address,
-            vdp_usb_request_type_direction_to_str(urb->setup_packet->bRequestType),
-            vdp_usb_request_type_type_to_str(urb->setup_packet->bRequestType),
-            vdp_usb_request_type_recipient_to_str(urb->setup_packet->bRequestType),
-            vdp_usb_request_to_str(urb->setup_packet->bRequest),
-            vdp_u16le_to_cpu(urb->setup_packet->wValue),
-            vdp_u16le_to_cpu(urb->setup_packet->wIndex),
-            vdp_u16le_to_cpu(urb->setup_packet->wLength));
+        if (VDP_USB_REQUESTTYPE_TYPE(urb->setup_packet->bRequestType) == VDP_USB_REQUESTTYPE_TYPE_STANDARD) {
+            ret = snprintf(
+                buff,
+                buff_size,
+                "id = %u, type = %s, flags = 0x%X, ep = 0x%.2X, bRequestType = %s:%s:%s, bRequest = %s, wValue = %u, wIndex = %u, buff = (%u)",
+                urb->id,
+                vdp_usb_urb_type_to_str(urb->type),
+                urb->flags,
+                urb->endpoint_address,
+                vdp_usb_request_type_direction_to_str(urb->setup_packet->bRequestType),
+                vdp_usb_request_type_type_to_str(urb->setup_packet->bRequestType),
+                vdp_usb_request_type_recipient_to_str(urb->setup_packet->bRequestType),
+                vdp_usb_request_to_str(urb->setup_packet->bRequest),
+                vdp_u16le_to_cpu(urb->setup_packet->wValue),
+                vdp_u16le_to_cpu(urb->setup_packet->wIndex),
+                vdp_u16le_to_cpu(urb->setup_packet->wLength));
+        } else {
+            ret = snprintf(
+                buff,
+                buff_size,
+                "id = %u, type = %s, flags = 0x%X, ep = 0x%.2X, bRequestType = %s:%s:%s, bRequest = 0x%X, wValue = %u, wIndex = %u, buff = (%u)",
+                urb->id,
+                vdp_usb_urb_type_to_str(urb->type),
+                urb->flags,
+                urb->endpoint_address,
+                vdp_usb_request_type_direction_to_str(urb->setup_packet->bRequestType),
+                vdp_usb_request_type_type_to_str(urb->setup_packet->bRequestType),
+                vdp_usb_request_type_recipient_to_str(urb->setup_packet->bRequestType),
+                (int)urb->setup_packet->bRequest,
+                vdp_u16le_to_cpu(urb->setup_packet->wValue),
+                vdp_u16le_to_cpu(urb->setup_packet->wIndex),
+                vdp_u16le_to_cpu(urb->setup_packet->wLength));
+        }
     } else {
         ret = snprintf(
             buff,

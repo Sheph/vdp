@@ -123,6 +123,43 @@ static const struct vdp_usb_string_table test_string_tables[] =
     {0, NULL},
 };
 
+static int test_process_control_urb(struct vdp_usb_urb* urb, int device_num)
+{
+    switch (urb->setup_packet->bRequest) {
+    case VDP_USB_REQUEST_GET_DESCRIPTOR: {
+        if (VDP_USB_REQUESTTYPE_TYPE(urb->setup_packet->bRequestType) != VDP_USB_REQUESTTYPE_TYPE_STANDARD) {
+            break;
+        }
+
+        vdp_u8 dt_type = vdp_u16le_to_cpu(urb->setup_packet->wValue) >> 8;
+
+        switch (dt_type) {
+        case VDP_USB_HID_DT_REPORT:
+            printf("get_hid_report_descriptor on device #%d\n", device_num);
+            urb->status = vdp_usb_urb_status_completed;
+            urb->actual_length = vdp_min(urb->transfer_length, sizeof(test_report_descriptor));
+            memcpy(urb->transfer_buffer, test_report_descriptor, urb->actual_length);
+            return 1;
+        default:
+            break;
+        }
+        break;
+    }
+    case VDP_USB_HID_REQUEST_SET_IDLE: {
+        if (VDP_USB_REQUESTTYPE_TYPE(urb->setup_packet->bRequestType) != VDP_USB_REQUESTTYPE_TYPE_CLASS) {
+            break;
+        }
+        printf("set_idle on device #%d\n", device_num);
+        urb->status = vdp_usb_urb_status_completed;
+        urb->actual_length = 0;
+        return 1;
+    }
+    default:
+        break;
+    }
+    return 0;
+}
+
 static vdp_usb_urb_status test_get_device_descriptor(void* user_data,
     struct vdp_usb_device_descriptor* descriptor)
 {
@@ -324,7 +361,13 @@ static int cmd_dump_events(char* argv[])
 
             printf("event on device #%d: urb %s\n", device_num, &urb_str[0]);
             if (!vdp_usb_filter(event.data.urb, &test_filter_ops, (void*)(vdp_uintptr)device_num)) {
-                event.data.urb->status = vdp_usb_urb_status_completed;
+                if (event.data.urb->type == vdp_usb_urb_control) {
+                    if (!test_process_control_urb(event.data.urb, device_num)) {
+                        event.data.urb->status = vdp_usb_urb_status_completed;
+                    }
+                } else {
+                    event.data.urb->status = vdp_usb_urb_status_completed;
+                }
             }
             vdp_usb_complete_urb(event.data.urb);
             vdp_usb_free_urb(event.data.urb);
