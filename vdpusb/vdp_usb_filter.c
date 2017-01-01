@@ -28,7 +28,7 @@ int vdp_usb_filter(struct vdp_usb_urb* urb, struct vdp_usb_filter_ops* ops,
         }
 
         vdp_u8 dt_type = vdp_u16le_to_cpu(urb->setup_packet->wValue) >> 8;
-        vdp_u8 dt_index = vdp_u16le_to_cpu(urb->setup_packet->wValue) & 0xF;
+        vdp_u8 dt_index = vdp_u16le_to_cpu(urb->setup_packet->wValue) & 0xFF;
 
         switch (dt_type) {
         case VDP_USB_DT_DEVICE:
@@ -99,6 +99,17 @@ int vdp_usb_filter(struct vdp_usb_urb* urb, struct vdp_usb_filter_ops* ops,
             break;
         }
         urb->status = ops->set_address(user_data, vdp_u16le_to_cpu(urb->setup_packet->wValue));
+        return 1;
+    }
+    case VDP_USB_REQUEST_SET_CONFIGURATION: {
+        if (!VDP_USB_URB_ENDPOINT_OUT(urb->endpoint_address) ||
+            (VDP_USB_REQUESTTYPE_RECIPIENT(urb->setup_packet->bRequestType) != VDP_USB_REQUESTTYPE_RECIPIENT_DEVICE) ||
+            !VDP_USB_REQUESTTYPE_OUT(urb->setup_packet->bRequestType) ||
+            (urb->setup_packet->wIndex != 0) ||
+            (urb->transfer_length != 0)) {
+            break;
+        }
+        urb->status = ops->set_configuration(user_data, vdp_u16le_to_cpu(urb->setup_packet->wValue) & 0xFF);
         return 1;
     }
     default:

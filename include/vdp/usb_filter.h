@@ -25,6 +25,9 @@ struct vdp_usb_filter_ops
 
     vdp_usb_urb_status (*set_address)(void* /*user_data*/,
         vdp_u16 /*address*/);
+
+    vdp_usb_urb_status (*set_configuration)(void* /*user_data*/,
+        vdp_u8 /*configuration*/);
 };
 
 /*

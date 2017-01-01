@@ -119,7 +119,7 @@ static vdp_usb_urb_status test_get_config_descriptor(void* user_data,
 {
     int device_num = (vdp_uintptr)user_data;
 
-    printf("get_config_descriptor on device #%d\n", device_num);
+    printf("get_config_descriptor(%d) on device #%d\n", (int)index, device_num);
 
     descriptor->bLength = sizeof(*descriptor);
     descriptor->bDescriptorType = VDP_USB_DT_CONFIG;
@@ -156,13 +156,24 @@ static vdp_usb_urb_status test_set_address(void* user_data,
     return vdp_usb_urb_status_completed;
 }
 
+static vdp_usb_urb_status test_set_configuration(void* user_data,
+    vdp_u8 configuration)
+{
+    int device_num = (vdp_uintptr)user_data;
+
+    printf("set_configuration(%d) on device #%d\n", (int)configuration, device_num);
+
+    return vdp_usb_urb_status_completed;
+}
+
 static struct vdp_usb_filter_ops test_filter_ops =
 {
     .get_device_descriptor = test_get_device_descriptor,
     .get_qualifier_descriptor = test_get_qualifier_descriptor,
     .get_config_descriptor = test_get_config_descriptor,
     .get_string_descriptor = test_get_string_descriptor,
-    .set_address = test_set_address
+    .set_address = test_set_address,
+    .set_configuration = test_set_configuration
 };
 
 static int cmd_dump_events(char* argv[])
