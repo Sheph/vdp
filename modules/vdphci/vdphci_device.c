@@ -420,10 +420,10 @@ static int vdphci_urb_hevent_write_common(u32 seq_num,
 
         if (urb->dev->speed == USB_SPEED_LOW ||
             urb->dev->speed == USB_SPEED_FULL) {
-            data.interval <<= 3;
+            data.interval *= 1000;
+        } else {
+            data.interval *= 125;
         }
-
-        data.interval *= 125;
     }
 
     return vdphci_direct_write(sizeof(struct vdphci_hevent_header),

@@ -99,7 +99,7 @@ static const struct vdp_usb_endpoint_descriptor test_endpoint_descriptor =
     .bEndpointAddress = VDP_USB_ENDPOINT_IN_ADDRESS(1),
     .bmAttributes = VDP_USB_ENDPOINT_XFER_INT,
     .wMaxPacketSize = 8,
-    .bInterval = 10
+    .bInterval = 7
 };
 
 static const struct vdp_usb_descriptor_header *test_descriptors[] =
@@ -157,6 +157,29 @@ static int test_process_control_urb(struct vdp_usb_urb* urb, int device_num)
     default:
         break;
     }
+    return 0;
+}
+
+static int test_process_int_urb(struct vdp_usb_urb* urb, int device_num)
+{
+    if (urb->transfer_length < 8) {
+        urb->status = vdp_usb_urb_status_completed;
+        return 0;
+    }
+
+    urb->transfer_buffer[0] = 0;
+    urb->transfer_buffer[1] = 0;
+    urb->transfer_buffer[2] = 0;
+    urb->transfer_buffer[3] = 0;
+
+    urb->transfer_buffer[4] = 1;
+    urb->transfer_buffer[5] = 0;
+
+    urb->transfer_buffer[6] = 1;
+    urb->transfer_buffer[7] = 0;
+
+    urb->actual_length = 8;
+    urb->status = vdp_usb_urb_status_completed;
     return 0;
 }
 
@@ -365,8 +388,13 @@ static int cmd_dump_events(char* argv[])
                     if (!test_process_control_urb(event.data.urb, device_num)) {
                         event.data.urb->status = vdp_usb_urb_status_completed;
                     }
+                } else if (event.data.urb->type == vdp_usb_urb_int) {
+                    usleep(event.data.urb->interval);
+                    if (!test_process_int_urb(event.data.urb, device_num)) {
+                        event.data.urb->status = vdp_usb_urb_status_completed;
+                    }
                 } else {
-                    event.data.urb->status = vdp_usb_urb_status_completed;
+                    event.data.urb->status = vdp_usb_urb_status_stall;
                 }
             }
             vdp_usb_complete_urb(event.data.urb);
