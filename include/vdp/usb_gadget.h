@@ -136,12 +136,12 @@ struct vdp_usb_gadget_ep
 {
     struct vdp_usb_gadget_ep_caps caps;
     void* priv;
+
+    int stalled;
 };
 
 struct vdp_usb_gadget_ep* vdp_usb_gadget_ep_create(const struct vdp_usb_gadget_ep_caps* caps,
     const struct vdp_usb_gadget_ep_ops* ops, void* priv);
-
-int vdp_usb_gadget_ep_stalled(struct vdp_usb_gadget_ep* ep);
 
 void vdp_usb_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep);
 
@@ -179,12 +179,12 @@ struct vdp_usb_gadget_interface
 {
     struct vdp_usb_gadget_interface_caps caps;
     void* priv;
+
+    int active;
 };
 
 struct vdp_usb_gadget_interface* vdp_usb_gadget_interface_create(const struct vdp_usb_gadget_interface_caps* caps,
     const struct vdp_usb_gadget_interface_ops* ops, void* priv);
-
-int vdp_usb_gadget_interface_active(struct vdp_usb_gadget_interface* interface);
 
 void vdp_usb_gadget_interface_destroy(struct vdp_usb_gadget_interface* interface);
 
@@ -227,12 +227,12 @@ struct vdp_usb_gadget_config
 {
     struct vdp_usb_gadget_config_caps caps;
     void* priv;
+
+    int active;
 };
 
 struct vdp_usb_gadget_config* vdp_usb_gadget_config_create(const struct vdp_usb_gadget_config_caps* caps,
     const struct vdp_usb_gadget_config_ops* ops, void* priv);
-
-int vdp_usb_gadget_config_active(struct vdp_usb_gadget_config* config);
 
 void vdp_usb_gadget_config_destroy(struct vdp_usb_gadget_config* config);
 
@@ -252,6 +252,8 @@ struct vdp_usb_gadget_ops
     void (*reset)(struct vdp_usb_gadget* /*gadget*/, int /*start*/);
 
     void (*power)(struct vdp_usb_gadget* /*gadget*/, int /*on*/);
+
+    void (*set_address)(struct vdp_usb_gadget* /*gadget*/, vdp_u32 /*address*/);
 
     void (*destroy)(struct vdp_usb_gadget* /*gadget*/);
 };
@@ -277,6 +279,8 @@ struct vdp_usb_gadget
 {
     struct vdp_usb_gadget_caps caps;
     void* priv;
+
+    vdp_u32 address;
 };
 
 struct vdp_usb_gadget* vdp_usb_gadget_create(const struct vdp_usb_gadget_caps* caps,
