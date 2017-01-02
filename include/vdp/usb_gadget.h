@@ -8,6 +8,22 @@ extern "C" {
 #endif
 
 /*
+ * USB Gadget API.
+ *
+ * The entities here are: request, caps, endpoint, interface, config and gadget.
+ *
+ * reguests are allocated by the gadget api and passed to endpoints, it's your
+ * responsibility to call request->complete in order to complete the underlying
+ * URB and then request->destroy to free memory.
+ *
+ * caps are passed when constructing an object, they're always deep-copied into
+ * object. if there're other objects in caps then their ownership is also passed
+ * to the object being constructed (only on successful construction). e.g.
+ * interface will take ownership of all endpoints, thus, when calling
+ * vdp_usb_gadget_interface_destroy it'll automatically destroy all endpoints.
+ */
+
+/*
  * USB Gadget Request.
  * @{
  */
@@ -50,7 +66,7 @@ struct vdp_usb_gadget_request
 
     vdp_u32 flags;
 
-    const struct vdp_usb_gadget_control_setup setup_packet;
+    struct vdp_usb_gadget_control_setup setup_packet;
 
     vdp_byte* transfer_buffer;
 
@@ -119,12 +135,11 @@ struct vdp_usb_gadget_ep_caps
 struct vdp_usb_gadget_ep
 {
     struct vdp_usb_gadget_ep_caps caps;
-    struct vdp_usb_gadget_ep_ops* ops;
     void* priv;
 };
 
 struct vdp_usb_gadget_ep* vdp_usb_gadget_ep_create(const struct vdp_usb_gadget_ep_caps* caps,
-    struct vdp_usb_gadget_ep_ops* ops, void* priv);
+    const struct vdp_usb_gadget_ep_ops* ops, void* priv);
 
 int vdp_usb_gadget_ep_stalled(struct vdp_usb_gadget_ep* ep);
 
@@ -163,12 +178,11 @@ struct vdp_usb_gadget_interface_caps
 struct vdp_usb_gadget_interface
 {
     struct vdp_usb_gadget_interface_caps caps;
-    struct vdp_usb_gadget_interface_ops* ops;
     void* priv;
 };
 
 struct vdp_usb_gadget_interface* vdp_usb_gadget_interface_create(const struct vdp_usb_gadget_interface_caps* caps,
-    struct vdp_usb_gadget_interface_ops* ops, void* priv);
+    const struct vdp_usb_gadget_interface_ops* ops, void* priv);
 
 int vdp_usb_gadget_interface_active(struct vdp_usb_gadget_interface* interface);
 
@@ -212,12 +226,11 @@ struct vdp_usb_gadget_config_caps
 struct vdp_usb_gadget_config
 {
     struct vdp_usb_gadget_config_caps caps;
-    struct vdp_usb_gadget_config_ops* ops;
     void* priv;
 };
 
 struct vdp_usb_gadget_config* vdp_usb_gadget_config_create(const struct vdp_usb_gadget_config_caps* caps,
-    struct vdp_usb_gadget_config_ops* ops, void* priv);
+    const struct vdp_usb_gadget_config_ops* ops, void* priv);
 
 int vdp_usb_gadget_config_active(struct vdp_usb_gadget_config* config);
 
@@ -254,6 +267,7 @@ struct vdp_usb_gadget_caps
     vdp_u32 product_id;
     int manufacturer;
     int product;
+    int serial_number;
     const struct vdp_usb_string_table* string_tables;
     struct vdp_usb_gadget_ep* endpoint0;
     struct vdp_usb_gadget_config** configs;
@@ -262,12 +276,11 @@ struct vdp_usb_gadget_caps
 struct vdp_usb_gadget
 {
     struct vdp_usb_gadget_caps caps;
-    struct vdp_usb_gadget_ops* ops;
     void* priv;
 };
 
 struct vdp_usb_gadget* vdp_usb_gadget_create(const struct vdp_usb_gadget_caps* caps,
-    struct vdp_usb_gadget_ops* ops, void* priv);
+    const struct vdp_usb_gadget_ops* ops, void* priv);
 
 void vdp_usb_gadget_event(struct vdp_usb_gadget* gadget, struct vdp_usb_event* event);
 
