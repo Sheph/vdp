@@ -24,3 +24,75 @@
  */
 
 #include "vdp/usb_gadget.h"
+#include "vdp/byte_order.h"
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+
+struct vdp_usb_gadget_epi
+{
+    struct vdp_usb_gadget_ep ep;
+
+    struct vdp_usb_gadget_ep_ops ops;
+
+    struct vdp_usb_endpoint_descriptor descriptor_in;
+    struct vdp_usb_endpoint_descriptor descriptor_out;
+};
+
+struct vdp_usb_gadget_ep* vdp_usb_gadget_ep_create(const struct vdp_usb_gadget_ep_caps* caps,
+    const struct vdp_usb_gadget_ep_ops* ops, void* priv)
+{
+    struct vdp_usb_gadget_epi* epi;
+
+    assert(caps);
+    assert(ops);
+
+    epi = malloc(sizeof(*epi));
+
+    if (epi == NULL) {
+        return NULL;
+    }
+
+    memset(epi, 0, sizeof(*epi));
+
+    memcpy(&epi->ep.caps, caps, sizeof(*caps));
+    epi->ep.priv = priv;
+    epi->ep.stalled = 0;
+
+    memcpy(&epi->ops, ops, sizeof(*ops));
+
+    if ((caps->dir & vdp_usb_gadget_ep_in) != 0) {
+        epi->descriptor_in.bLength = VDP_USB_DT_ENDPOINT_SIZE;
+        epi->descriptor_in.bDescriptorType = VDP_USB_DT_ENDPOINT;
+        epi->descriptor_in.bEndpointAddress = VDP_USB_ENDPOINT_IN_ADDRESS(caps->address);
+        epi->descriptor_in.bmAttributes = caps->type;
+        epi->descriptor_in.wMaxPacketSize = vdp_cpu_to_u16le(caps->max_packet_size);
+        epi->descriptor_in.bInterval = caps->interval;
+    }
+
+    if ((caps->dir & vdp_usb_gadget_ep_out) != 0) {
+        epi->descriptor_in.bLength = VDP_USB_DT_ENDPOINT_SIZE;
+        epi->descriptor_in.bDescriptorType = VDP_USB_DT_ENDPOINT;
+        epi->descriptor_in.bEndpointAddress = VDP_USB_ENDPOINT_OUT_ADDRESS(caps->address);
+        epi->descriptor_in.bmAttributes = caps->type;
+        epi->descriptor_in.wMaxPacketSize = vdp_cpu_to_u16le(caps->max_packet_size);
+        epi->descriptor_in.bInterval = caps->interval;
+    }
+
+    return &epi->ep;
+}
+
+void vdp_usb_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep)
+{
+    struct vdp_usb_gadget_epi* epi;
+
+    if (!ep) {
+        return;
+    }
+
+    epi = vdp_containerof(ep, struct vdp_usb_gadget_epi, ep);
+
+    epi->ops.destroy(ep);
+
+    free(epi);
+}

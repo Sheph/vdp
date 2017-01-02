@@ -135,9 +135,9 @@ struct vdp_usb_gadget_ep_ops
 
 typedef enum
 {
-    vdp_usb_gadget_ep_in = 0,
-    vdp_usb_gadget_ep_out = 1,
-    vdp_usb_gadget_ep_inout = 2
+    vdp_usb_gadget_ep_in = (1 << 0),
+    vdp_usb_gadget_ep_out = (1 << 1),
+    vdp_usb_gadget_ep_inout = vdp_usb_gadget_ep_in | vdp_usb_gadget_ep_out
 } vdp_usb_gadget_ep_dir;
 
 typedef enum
