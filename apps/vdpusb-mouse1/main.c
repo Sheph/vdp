@@ -172,10 +172,12 @@ static int test_process_int_urb(struct vdp_usb_urb* urb, int device_num)
     urb->transfer_buffer[2] = 0;
     urb->transfer_buffer[3] = 0;
 
-    urb->transfer_buffer[4] = 1;
+    // X:
+    urb->transfer_buffer[4] = 0;
     urb->transfer_buffer[5] = 0;
 
-    urb->transfer_buffer[6] = 1;
+    // Y:
+    urb->transfer_buffer[6] = 0;
     urb->transfer_buffer[7] = 0;
 
     urb->actual_length = 8;
@@ -292,13 +294,12 @@ static struct vdp_usb_filter_ops test_filter_ops =
     .set_configuration = test_set_configuration
 };
 
-static int cmd_dump_events(char* argv[])
+static int run(int device_num)
 {
     int ret = 1;
     vdp_usb_result vdp_res;
     struct vdp_usb_context* context = NULL;
     struct vdp_usb_device* device = NULL;
-    int device_num = 0;
     vdp_u8 device_lower, device_upper;
 
     vdp_res = vdp_usb_init(stdout, vdp_log_debug, &context);
@@ -314,8 +315,6 @@ static int cmd_dump_events(char* argv[])
     if (vdp_res == vdp_usb_success) {
         printf("device range is: %d - %d\n", device_lower, device_upper);
     }
-
-    device_num = atoi(argv[0]);
 
     vdp_res = vdp_usb_device_open(context, (vdp_u8)device_num, &device);
 
@@ -429,71 +428,12 @@ out1:
     return ret;
 }
 
-typedef int (*command_handler)(char* argv[]);
-
-const struct
-{
-    const char* cmd_name;
-    const char* cmd_args;
-    const char* cmd_description;
-    unsigned int cmd_num_args;
-    command_handler cmd_handler;
-} commands[] =
-{
-    {"dump_events", " <device number>", "Dumps events from device #<device number>", 1, cmd_dump_events}
-};
-
 int main(int argc, char* argv[])
 {
-    int i, ret, handler_found = 0;
-
-    ret = 1;
-
-    if (argc > 1) {
-        for (i = 0; i < sizeof(commands)/sizeof(commands[0]); ++i) {
-            if ((strcasecmp(argv[1], commands[i].cmd_name) == 0) && ((argc - 2) == commands[i].cmd_num_args)) {
-                handler_found = 1;
-
-                ret = commands[i].cmd_handler(argv + 2);
-
-                break;
-            }
-        }
+    if (argc < 2) {
+        printf("usage: vdpusb-mouse1 <port>\n");
+        return 1;
     }
 
-    if (!handler_found) {
-        size_t len;
-        size_t max_len = 0;
-        size_t j = 0;
-
-        printf("usage: vdpusb-app <cmd> [args]\n");
-
-        for (i = 0; i < sizeof(commands)/sizeof(commands[0]); ++i) {
-            len = strlen(commands[i].cmd_name) + strlen(commands[i].cmd_args);
-
-            if (len > max_len) {
-                max_len = len;
-            }
-        }
-
-        printf("<cmd>:\n");
-
-        for (i = 0; i < sizeof(commands)/sizeof(commands[0]); ++i) {
-            for (j = 0; j < strlen("usage: "); ++j) {
-                printf(" ");
-            }
-
-            printf("%s%s", commands[i].cmd_name, commands[i].cmd_args);
-
-            len = strlen(commands[i].cmd_name) + strlen(commands[i].cmd_args);
-
-            for (j = 0; j < (max_len - len); ++j) {
-                printf(" ");
-            }
-
-            printf(" - %s\n", commands[i].cmd_description);
-        }
-    }
-
-    return ret;
+    return run(atoi(argv[1]));
 }

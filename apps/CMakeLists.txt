@@ -1,1 +1,1 @@
-add_subdirectory(vdpusb-test)
+add_subdirectory(vdpusb-mouse1)
