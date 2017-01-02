@@ -8,6 +8,74 @@ extern "C" {
 #endif
 
 /*
+ * USB Gadget Request.
+ * @{
+ */
+
+typedef enum
+{
+    vdp_usb_gadget_request_standard = VDP_USB_REQUESTTYPE_TYPE_STANDARD,
+    vdp_usb_gadget_request_class = VDP_USB_REQUESTTYPE_TYPE_CLASS,
+    vdp_usb_gadget_request_vendor = VDP_USB_REQUESTTYPE_TYPE_VENDOR,
+    vdp_usb_gadget_request_reserved = VDP_USB_REQUESTTYPE_TYPE_RESERVED
+} vdp_usb_gadget_request_type;
+
+typedef enum
+{
+    vdp_usb_gadget_request_device = VDP_USB_REQUESTTYPE_RECIPIENT_DEVICE,
+    vdp_usb_gadget_request_interface = VDP_USB_REQUESTTYPE_RECIPIENT_INTERFACE,
+    vdp_usb_gadget_request_endpoint = VDP_USB_REQUESTTYPE_RECIPIENT_ENDPOINT,
+    vdp_usb_gadget_request_other = VDP_USB_REQUESTTYPE_RECIPIENT_OTHER
+} vdp_usb_gadget_request_recipient;
+
+struct vdp_usb_gadget_control_setup
+{
+    vdp_usb_gadget_request_type type;
+    vdp_usb_gadget_request_recipient recipient;
+    vdp_u32 request;
+    vdp_u32 value;
+    vdp_u32 index;
+};
+
+typedef enum
+{
+    vdp_usb_gadget_request_zero_packet = VDP_USB_URB_ZERO_PACKET
+} vdp_usb_gadget_request_flag;
+
+struct vdp_usb_gadget_request
+{
+    vdp_u32 id;
+
+    int in;
+
+    vdp_u32 flags;
+
+    const struct vdp_usb_gadget_control_setup setup_packet;
+
+    vdp_byte* transfer_buffer;
+
+    vdp_u32 transfer_length;
+
+    vdp_u32 actual_length;
+
+    vdp_u32 number_of_packets;
+
+    vdp_u32 interval_us;
+
+    vdp_usb_urb_status status;
+
+    struct vdp_usb_iso_packet* iso_packets;
+
+    vdp_usb_result (*complete)(struct vdp_usb_gadget_request* /*request*/);
+
+    void (*destroy)(struct vdp_usb_gadget_request* /*request*/);
+};
+
+/*
+ * @}
+ */
+
+/*
  * USB Gadget Endpoint.
  * @{
  */
@@ -16,8 +84,8 @@ struct vdp_usb_gadget_ep;
 
 struct vdp_usb_gadget_ep_ops
 {
-    void (*enqueue)(struct vdp_usb_gadget_ep* /*ep*/, struct vdp_usb_urb* /*urb*/);
-    void (*dequeue)(struct vdp_usb_gadget_ep* /*ep*/, vdp_u32 /*urb_id*/);
+    void (*enqueue)(struct vdp_usb_gadget_ep* /*ep*/, struct vdp_usb_gadget_request* /*request*/);
+    void (*dequeue)(struct vdp_usb_gadget_ep* /*ep*/, vdp_u32 /*request_id*/);
 
     vdp_usb_urb_status (*clear_stall)(struct vdp_usb_gadget_ep* /*ep*/);
 
