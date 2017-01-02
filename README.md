@@ -1,5 +1,4 @@
 Virtual Device Platform (https://github.com/Sheph/vdp)
-
 =========================
 
 1. About
