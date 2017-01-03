@@ -196,7 +196,7 @@ struct vdp_usb_gadget_interface_caps
     vdp_u32 subklass;
     vdp_u32 protocol;
     int description;
-    const struct vdp_usb_descriptor_header** descriptors;
+    struct vdp_usb_descriptor_header** descriptors;
     struct vdp_usb_gadget_ep** endpoints;
 };
 
@@ -295,7 +295,7 @@ struct vdp_usb_gadget_caps
     int manufacturer;
     int product;
     int serial_number;
-    const struct vdp_usb_string_table* string_tables;
+    struct vdp_usb_string_table* string_tables;
     struct vdp_usb_gadget_ep* endpoint0;
     struct vdp_usb_gadget_config** configs;
 };
