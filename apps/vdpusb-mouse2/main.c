@@ -95,6 +95,11 @@ static const vdp_u8 test_report_descriptor[] =
 };
 #pragma pack()
 
+static void ep0_enable(struct vdp_usb_gadget_ep* ep, int value)
+{
+    printf("ep0 enable = %d\n", value);
+}
+
 static void ep0_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
 {
     printf("ep0 enqueue %u\n", request->id);
@@ -120,6 +125,11 @@ static vdp_usb_urb_status ep0_clear_stall(struct vdp_usb_gadget_ep* ep)
 static void ep0_destroy(struct vdp_usb_gadget_ep* ep)
 {
     printf("ep0 destroy\n");
+}
+
+static void ep1_enable(struct vdp_usb_gadget_ep* ep, int value)
+{
+    printf("ep1 enable = %d\n", value);
 }
 
 static void ep1_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
@@ -203,6 +213,7 @@ static struct vdp_usb_gadget* create_gadget()
     };
     struct vdp_usb_gadget_ep_ops ep0_ops =
     {
+        .enable = ep0_enable,
         .enqueue = ep0_enqueue,
         .dequeue = ep0_dequeue,
         .clear_stall = ep0_clear_stall,
@@ -218,6 +229,7 @@ static struct vdp_usb_gadget* create_gadget()
     };
     struct vdp_usb_gadget_ep_ops ep1_ops =
     {
+        .enable = ep1_enable,
         .enqueue = ep1_enqueue,
         .dequeue = ep1_dequeue,
         .clear_stall = ep1_clear_stall,

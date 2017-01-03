@@ -128,6 +128,8 @@ struct vdp_usb_gadget_ep;
 
 struct vdp_usb_gadget_ep_ops
 {
+    void (*enable)(struct vdp_usb_gadget_ep* /*ep*/, int /*value*/);
+
     void (*enqueue)(struct vdp_usb_gadget_ep* /*ep*/, struct vdp_usb_gadget_request* /*request*/);
     void (*dequeue)(struct vdp_usb_gadget_ep* /*ep*/, struct vdp_usb_gadget_request* /*request*/);
 
@@ -165,6 +167,7 @@ struct vdp_usb_gadget_ep
     struct vdp_usb_gadget_ep_caps caps;
     void* priv;
 
+    int active;
     int stalled;
 
     struct vdp_list requests;
@@ -311,8 +314,6 @@ struct vdp_usb_gadget
     void* priv;
 
     vdp_u32 address;
-
-    int active_config; // initially -1
 };
 
 struct vdp_usb_gadget* vdp_usb_gadget_create(const struct vdp_usb_gadget_caps* caps,
