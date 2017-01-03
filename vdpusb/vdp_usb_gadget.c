@@ -24,6 +24,7 @@
  */
 
 #include "vdp/usb_gadget.h"
+#include "vdp/usb_filter.h"
 #include "vdp/byte_order.h"
 #include <assert.h>
 #include <stdlib.h>
@@ -70,6 +71,7 @@ struct vdp_usb_gadget_ep* vdp_usb_gadget_ep_create(const struct vdp_usb_gadget_e
     memcpy(&epi->ep.caps, caps, sizeof(*caps));
     epi->ep.priv = priv;
     epi->ep.stalled = 0;
+    vdp_list_init(&epi->ep.requests);
 
     memcpy(&epi->ops, ops, sizeof(*ops));
 
@@ -97,6 +99,7 @@ struct vdp_usb_gadget_ep* vdp_usb_gadget_ep_create(const struct vdp_usb_gadget_e
 void vdp_usb_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep)
 {
     struct vdp_usb_gadget_epi* epi;
+    struct vdp_usb_gadget_request *request, *next;
 
     if (!ep) {
         return;
@@ -105,6 +108,14 @@ void vdp_usb_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep)
     epi = vdp_containerof(ep, struct vdp_usb_gadget_epi, ep);
 
     epi->ops.destroy(ep);
+
+    vdp_list_for_each_safe(struct vdp_usb_gadget_request,
+        request, next, &epi->ep.requests, entry) {
+        request->complete(request);
+        request->destroy(request);
+    }
+
+    assert(vdp_list_empty(&epi->ep.requests));
 
     free(epi);
 }
@@ -316,7 +327,7 @@ struct vdp_usb_gadget_config* vdp_usb_gadget_config_create(const struct vdp_usb_
         configi->other[cnt++] = (struct vdp_usb_descriptor_header*)&interfacei->descriptor;
         memcpy(&configi->other[cnt],
             interface->caps.descriptors,
-            ptr_array_count((void**)interface->caps.descriptors));
+            ptr_array_count((void**)interface->caps.descriptors) * sizeof(configi->other[0]));
         cnt += ptr_array_count((void**)interface->caps.descriptors);
 
         for (j = 0; interface->caps.endpoints[j]; ++j) {
@@ -381,6 +392,100 @@ struct vdp_usb_gadgeti
     struct vdp_usb_gadget_ops ops;
 
     struct vdp_usb_device_descriptor descriptor;
+    struct vdp_usb_qualifier_descriptor qual_descriptor;
+};
+
+static vdp_usb_urb_status gadget_get_device_descriptor(void* user_data,
+    struct vdp_usb_device_descriptor* descriptor)
+{
+    struct vdp_usb_gadgeti* gadgeti = user_data;
+
+    memcpy(descriptor, &gadgeti->descriptor, sizeof(gadgeti->descriptor));
+
+    return vdp_usb_urb_status_completed;
+}
+
+static vdp_usb_urb_status gadget_get_qualifier_descriptor(void* user_data,
+    struct vdp_usb_qualifier_descriptor* descriptor)
+{
+    struct vdp_usb_gadgeti* gadgeti = user_data;
+
+    memcpy(descriptor, &gadgeti->qual_descriptor, sizeof(gadgeti->qual_descriptor));
+
+    return vdp_usb_urb_status_completed;
+}
+
+static vdp_usb_urb_status gadget_get_config_descriptor(void* user_data,
+    vdp_u8 index,
+    struct vdp_usb_config_descriptor* descriptor,
+    struct vdp_usb_descriptor_header*** other)
+{
+    struct vdp_usb_gadgeti* gadgeti = user_data;
+    struct vdp_usb_gadget_configi* configi;
+
+    if (index >= gadgeti->descriptor.bNumConfigurations) {
+        gadgeti->gadget.caps.endpoint0->stalled = 1;
+        return vdp_usb_urb_status_stall;
+    }
+
+    configi = vdp_containerof(gadgeti->gadget.caps.configs[index],
+        struct vdp_usb_gadget_configi, config);
+
+    memcpy(descriptor, &configi->descriptor, sizeof(configi->descriptor));
+
+    *other = configi->other;
+
+    return vdp_usb_urb_status_completed;
+}
+
+static vdp_usb_urb_status gadget_get_string_descriptor(void* user_data,
+    const struct vdp_usb_string_table** tables)
+{
+    struct vdp_usb_gadgeti* gadgeti = user_data;
+
+    *tables = gadgeti->gadget.caps.string_tables;
+
+    return vdp_usb_urb_status_completed;
+}
+
+static vdp_usb_urb_status gadget_set_address(void* user_data,
+    vdp_u16 address)
+{
+    struct vdp_usb_gadgeti* gadgeti = user_data;
+
+    gadgeti->gadget.address = address;
+
+    gadgeti->ops.set_address(&gadgeti->gadget, gadgeti->gadget.address);
+
+    return vdp_usb_urb_status_completed;
+}
+
+static vdp_usb_urb_status gadget_set_configuration(void* user_data,
+    vdp_u8 configuration)
+{
+    int i;
+    struct vdp_usb_gadgeti* gadgeti = user_data;
+
+    for (i = 0; gadgeti->gadget.caps.configs[i]; ++i) {
+        struct vdp_usb_gadget_configi* configi = vdp_containerof(gadgeti->gadget.caps.configs[i],
+            struct vdp_usb_gadget_configi, config);
+        if (configi->descriptor.bConfigurationValue == configuration) {
+            return vdp_usb_urb_status_completed;
+        }
+    }
+
+    gadgeti->gadget.caps.endpoint0->stalled = 1;
+    return vdp_usb_urb_status_stall;
+}
+
+static struct vdp_usb_filter_ops gadget_filter_ops =
+{
+    .get_device_descriptor = gadget_get_device_descriptor,
+    .get_qualifier_descriptor = gadget_get_qualifier_descriptor,
+    .get_config_descriptor = gadget_get_config_descriptor,
+    .get_string_descriptor = gadget_get_string_descriptor,
+    .set_address = gadget_set_address,
+    .set_configuration = gadget_set_configuration
 };
 
 struct vdp_usb_gadget* vdp_usb_gadget_create(const struct vdp_usb_gadget_caps* caps,
@@ -459,6 +564,7 @@ struct vdp_usb_gadget* vdp_usb_gadget_create(const struct vdp_usb_gadget_caps* c
 
     gadgeti->gadget.priv = priv;
     gadgeti->gadget.address = 0;
+    gadgeti->gadget.active_config = -1;
 
     memcpy(&gadgeti->ops, ops, sizeof(*ops));
 
@@ -476,6 +582,16 @@ struct vdp_usb_gadget* vdp_usb_gadget_create(const struct vdp_usb_gadget_caps* c
     gadgeti->descriptor.iProduct = caps->product;
     gadgeti->descriptor.iSerialNumber = caps->serial_number;
     gadgeti->descriptor.bNumConfigurations = ptr_array_count((void**)caps->configs);
+
+    gadgeti->qual_descriptor.bLength = sizeof(gadgeti->qual_descriptor);
+    gadgeti->qual_descriptor.bDescriptorType = VDP_USB_DT_QUALIFIER;
+    gadgeti->qual_descriptor.bcdUSB = vdp_cpu_to_u16le(caps->bcd_usb);
+    gadgeti->qual_descriptor.bDeviceClass = caps->klass;
+    gadgeti->qual_descriptor.bDeviceSubClass = caps->subklass;
+    gadgeti->qual_descriptor.bDeviceProtocol = caps->protocol;
+    gadgeti->qual_descriptor.bMaxPacketSize0 = caps->endpoint0 ? caps->endpoint0->caps.max_packet_size : 64;
+    gadgeti->qual_descriptor.bNumConfigurations = ptr_array_count((void**)caps->configs);
+    gadgeti->qual_descriptor.bRESERVED = 0;
 
     return &gadgeti->gadget;
 
@@ -497,14 +613,44 @@ fail1:
 
 void vdp_usb_gadget_event(struct vdp_usb_gadget* gadget, struct vdp_usb_event* event)
 {
+    struct vdp_usb_gadgeti* gadgeti;
+
+    if (!gadget) {
+        return;
+    }
+
+    gadgeti = vdp_containerof(gadget, struct vdp_usb_gadgeti, gadget);
+
     switch (event->type) {
     case vdp_usb_event_none: {
         break;
     }
     case vdp_usb_event_signal: {
+        switch (event->data.signal.type) {
+        case vdp_usb_signal_reset_start:
+            gadgeti->ops.reset(gadget, 1);
+            break;
+        case vdp_usb_signal_reset_end:
+            gadgeti->ops.reset(gadget, 0);
+            break;
+        case vdp_usb_signal_power_on:
+            gadgeti->ops.power(gadget, 1);
+            break;
+        case vdp_usb_signal_power_off:
+            gadgeti->ops.power(gadget, 0);
+            break;
+        default:
+            assert(0);
+            break;
+        }
         break;
     }
     case vdp_usb_event_urb: {
+        if (!vdp_usb_filter(event->data.urb, &gadget_filter_ops, gadgeti)) {
+            event->data.urb->status = vdp_usb_urb_status_completed;
+        }
+        vdp_usb_complete_urb(event->data.urb);
+        vdp_usb_free_urb(event->data.urb);
         break;
     }
     case vdp_usb_event_unlink_urb: {

@@ -34,6 +34,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include <assert.h>
+#include <signal.h>
+
+static int done = 0;
 
 static void print_error(vdp_usb_result res, const char* fmt, ...)
 {
@@ -93,7 +96,7 @@ static const vdp_u8 test_report_descriptor[] =
 };
 #pragma pack()
 
-static const struct vdp_usb_interface_descriptor test_interface_descriptor =
+static struct vdp_usb_interface_descriptor test_interface_descriptor =
 {
     .bLength = sizeof(struct vdp_usb_interface_descriptor),
     .bDescriptorType = VDP_USB_DT_INTERFACE,
@@ -106,7 +109,7 @@ static const struct vdp_usb_interface_descriptor test_interface_descriptor =
     .iInterface = 0
 };
 
-static const struct vdp_usb_hid_descriptor test_hid_descriptor =
+static struct vdp_usb_hid_descriptor test_hid_descriptor =
 {
     .bLength = sizeof(struct vdp_usb_hid_descriptor),
     .bDescriptorType = VDP_USB_HID_DT_HID,
@@ -117,7 +120,7 @@ static const struct vdp_usb_hid_descriptor test_hid_descriptor =
     .desc[0].wDescriptorLength = sizeof(test_report_descriptor)
 };
 
-static const struct vdp_usb_endpoint_descriptor test_endpoint_descriptor =
+static struct vdp_usb_endpoint_descriptor test_endpoint_descriptor =
 {
     .bLength = VDP_USB_DT_ENDPOINT_SIZE,
     .bDescriptorType = VDP_USB_DT_ENDPOINT,
@@ -127,11 +130,11 @@ static const struct vdp_usb_endpoint_descriptor test_endpoint_descriptor =
     .bInterval = 7
 };
 
-static const struct vdp_usb_descriptor_header *test_descriptors[] =
+static struct vdp_usb_descriptor_header *test_descriptors[] =
 {
-    (const struct vdp_usb_descriptor_header *)&test_interface_descriptor,
-    (const struct vdp_usb_descriptor_header *)&test_hid_descriptor,
-    (const struct vdp_usb_descriptor_header *)&test_endpoint_descriptor,
+    (struct vdp_usb_descriptor_header *)&test_interface_descriptor,
+    (struct vdp_usb_descriptor_header *)&test_hid_descriptor,
+    (struct vdp_usb_descriptor_header *)&test_endpoint_descriptor,
     NULL,
 };
 
@@ -258,7 +261,7 @@ static vdp_usb_urb_status test_get_qualifier_descriptor(void* user_data,
 static vdp_usb_urb_status test_get_config_descriptor(void* user_data,
     vdp_u8 index,
     struct vdp_usb_config_descriptor* descriptor,
-    const struct vdp_usb_descriptor_header*** other)
+    struct vdp_usb_descriptor_header*** other)
 {
     int device_num = (vdp_uintptr)user_data;
 
@@ -357,7 +360,7 @@ static int run(int device_num)
         goto out2;
     }
 
-    while (1) {
+    while (!done) {
         int io_res;
         fd_set read_fds;
         vdp_fd fd;
@@ -453,8 +456,15 @@ out1:
     return ret;
 }
 
+static void sig_handler(int signum)
+{
+    done = 1;
+}
+
 int main(int argc, char* argv[])
 {
+    signal(SIGINT, &sig_handler);
+
     if (argc < 2) {
         printf("usage: vdpusb-mouse1 <port>\n");
         return 1;

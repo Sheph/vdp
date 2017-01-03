@@ -27,6 +27,7 @@
 #define _VDP_USB_GADGET_H_
 
 #include "vdp/usb_util.h"
+#include "vdp/list.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -85,6 +86,8 @@ typedef enum
 
 struct vdp_usb_gadget_request
 {
+    struct vdp_list entry;
+
     vdp_u32 id;
 
     int in;
@@ -126,7 +129,7 @@ struct vdp_usb_gadget_ep;
 struct vdp_usb_gadget_ep_ops
 {
     void (*enqueue)(struct vdp_usb_gadget_ep* /*ep*/, struct vdp_usb_gadget_request* /*request*/);
-    void (*dequeue)(struct vdp_usb_gadget_ep* /*ep*/, vdp_u32 /*request_id*/);
+    void (*dequeue)(struct vdp_usb_gadget_ep* /*ep*/, struct vdp_usb_gadget_request* /*request*/);
 
     vdp_usb_urb_status (*clear_stall)(struct vdp_usb_gadget_ep* /*ep*/);
 
@@ -163,6 +166,8 @@ struct vdp_usb_gadget_ep
     void* priv;
 
     int stalled;
+
+    struct vdp_list requests;
 };
 
 struct vdp_usb_gadget_ep* vdp_usb_gadget_ep_create(const struct vdp_usb_gadget_ep_caps* caps,
@@ -306,6 +311,8 @@ struct vdp_usb_gadget
     void* priv;
 
     vdp_u32 address;
+
+    int active_config; // initially -1
 };
 
 struct vdp_usb_gadget* vdp_usb_gadget_create(const struct vdp_usb_gadget_caps* caps,

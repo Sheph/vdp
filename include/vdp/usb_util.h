@@ -210,7 +210,7 @@ vdp_u32 vdp_usb_write_device_descriptor(
  */
 vdp_u32 vdp_usb_write_config_descriptor(
     const struct vdp_usb_config_descriptor* descriptor,
-    const struct vdp_usb_descriptor_header** other,
+    struct vdp_usb_descriptor_header** other,
     vdp_byte* buff,
     vdp_u32 buff_size);
 

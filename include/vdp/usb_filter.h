@@ -43,7 +43,7 @@ struct vdp_usb_filter_ops
     vdp_usb_urb_status (*get_config_descriptor)(void* /*user_data*/,
         vdp_u8 /*index*/,
         struct vdp_usb_config_descriptor* /*descriptor*/,
-        const struct vdp_usb_descriptor_header*** /*other*/);
+        struct vdp_usb_descriptor_header*** /*other*/);
 
     vdp_usb_urb_status (*get_string_descriptor)(void* /*user_data*/,
         const struct vdp_usb_string_table** /*tables*/);
