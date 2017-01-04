@@ -48,8 +48,9 @@ set(VDP_OUT_DIR ${VDP_BINARY_DIR}/out)
 
 #set includes/libs
 
-set(VDP_INCLUDE_DIRECTORIES "${VDP_SOURCE_DIR}/include")
-include_directories(${VDP_INCLUDE_DIRECTORIES})
+set(VDP_INCLUDE_DIR "${VDP_SOURCE_DIR}/include")
+include_directories(${VDP_INCLUDE_DIR})
+include_directories(${VDP_INCLUDE_DIR}/libusb-1.0)
 
 #fix output directories
 
@@ -64,6 +65,7 @@ endif ()
 
 add_subdirectory(modules)
 add_subdirectory(lwl-1.1)
+add_subdirectory(libusb-1.0.21)
 add_subdirectory(vdpusb)
 add_subdirectory(apps)
 

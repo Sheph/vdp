@@ -19,7 +19,7 @@ set(HDRS
     vdphci_direct_io.h
 )
 
-set(VDPHCI_C_FLAGS -Wall -I${VDP_INCLUDE_DIRECTORIES})
+set(VDPHCI_C_FLAGS -Wall -I${VDP_INCLUDE_DIR})
 
 if (VDP_BUILD_TYPE STREQUAL "debug")
     set(VDPHCI_C_FLAGS ${VDPHCI_C_FLAGS} -O -g -DDEBUG)
