@@ -34,20 +34,162 @@
 #include <assert.h>
 #include <signal.h>
 
+struct proxy_device;
+
 static int done = 0;
+static struct vdp_usb_device* vdp_devs[5];
+static struct proxy_device* proxy_devs[5];
+
+struct proxy_device
+{
+    libusb_device_handle* handle;
+    struct vdp_usb_gadget* gadget;
+};
+
+static struct vdp_usb_gadget_ep* create_proxy_gadget_ep(const struct libusb_endpoint_descriptor* desc)
+{
+    // TODO
+    return NULL;
+}
+
+static struct vdp_usb_gadget_interface* create_proxy_gadget_interface(const struct libusb_interface_descriptor* desc)
+{
+    // TODO
+    return NULL;
+}
+
+static struct vdp_usb_gadget_config* create_proxy_gadget_config(const struct libusb_config_descriptor* desc)
+{
+    // TODO
+    return NULL;
+}
+
+static struct vdp_usb_gadget* create_proxy_gadget(const struct libusb_device_descriptor* dev_desc,
+    struct libusb_config_descriptor** config_descs)
+{
+    // TODO
+    return NULL;
+}
+
+static struct proxy_device* proxy_device_create(libusb_device_handle* handle)
+{
+    struct proxy_device* proxy_dev;
+    struct libusb_device_descriptor dev_desc;
+    int res;
+    libusb_device* dev = libusb_get_device(handle);
+    uint8_t i;
+    struct libusb_config_descriptor** config_descs;
+
+    proxy_dev = malloc(sizeof(*proxy_dev));
+    if (!proxy_dev) {
+        goto fail1;
+    }
+
+    proxy_dev->handle = handle;
+
+    res = libusb_get_device_descriptor(dev, &dev_desc);
+    if (res != LIBUSB_SUCCESS) {
+        printf("error getting device descriptor\n");
+        goto fail2;
+    }
+
+    config_descs = malloc(sizeof(*config_descs) * (int)dev_desc.bNumConfigurations);
+    if (!config_descs) {
+        printf("cannot allocate mem for config descs\n");
+        goto fail2;
+    }
+
+    memset(config_descs, 0,
+        sizeof(*config_descs) * (int)dev_desc.bNumConfigurations);
+
+    for (i = 0; i < dev_desc.bNumConfigurations; ++i) {
+        res = libusb_get_config_descriptor(dev, i, &config_descs[i]);
+        if (res != LIBUSB_SUCCESS) {
+            printf("error getting config descriptor\n");
+            goto fail3;
+        }
+    }
+
+    proxy_dev->gadget = create_proxy_gadget(&dev_desc, config_descs);
+    if (!proxy_dev->gadget) {
+        printf("cannot create proxy gadget\n");
+        goto fail3;
+    }
+
+    for (i = 0; i < dev_desc.bNumConfigurations; ++i) {
+        libusb_free_config_descriptor(config_descs[i]);
+    }
+    free(config_descs);
+
+    return proxy_dev;
+
+fail3:
+    for (i = 0; i < dev_desc.bNumConfigurations; ++i) {
+        libusb_free_config_descriptor(config_descs[i]);
+    }
+    free(config_descs);
+fail2:
+    free(proxy_dev);
+fail1:
+
+    return NULL;
+}
+
+static void proxy_device_destroy(struct proxy_device* proxy)
+{
+    vdp_usb_gadget_destroy(proxy->gadget);
+    libusb_close(proxy->handle);
+    free(proxy);
+}
 
 static int hotplug_callback_attach(libusb_context* ctx, libusb_device* dev, libusb_hotplug_event event, void* user_data)
 {
+    int i;
+
     printf("device attached: %d:%d\n",
         libusb_get_bus_number(dev), libusb_get_port_number(dev));
+
+    for (i = 0; i < sizeof(proxy_devs)/sizeof(proxy_devs[0]); ++i) {
+        if (!proxy_devs[i]) {
+            libusb_device_handle* handle;
+            int res;
+
+            res = libusb_open(dev, &handle);
+            if (res != LIBUSB_SUCCESS) {
+                printf("error opening device\n");
+                break;
+            }
+
+            proxy_devs[i] = proxy_device_create(handle);
+            if (!proxy_devs[i]) {
+                libusb_close(handle);
+            }
+
+            break;
+        }
+    }
 
     return 0;
 }
 
 static int hotplug_callback_detach(libusb_context* ctx, libusb_device* dev, libusb_hotplug_event event, void* user_data)
 {
+    int i;
+
     printf("device detached: %d:%d\n",
         libusb_get_bus_number(dev), libusb_get_port_number(dev));
+
+    for (i = 0; i < sizeof(proxy_devs)/sizeof(proxy_devs[0]); ++i) {
+        if (proxy_devs[i]) {
+            libusb_device* other_dev = libusb_get_device(proxy_devs[i]->handle);
+            if ((libusb_get_bus_number(dev) == libusb_get_bus_number(other_dev)) &&
+                (libusb_get_port_number(dev) == libusb_get_port_number(other_dev))) {
+                proxy_device_destroy(proxy_devs[i]);
+                proxy_devs[i] = NULL;
+                break;
+            }
+        }
+    }
 
     return 0;
 }
@@ -64,12 +206,16 @@ int main(int argc, char* argv[])
     int res;
     libusb_device** devs;
     ssize_t cnt;
+    struct vdp_usb_context* ctx;
+    vdp_usb_result vdp_res;
+    int i;
 
     signal(SIGINT, &sig_handler);
 
     if (argc < 3) {
         printf("usage: vdpusb-proxy <vendor_id> <product_id>\n");
-        return 1;
+        res = 1;
+        goto out1;
     }
 
     vendor_id = (int)strtol(argv[1], NULL, 16);
@@ -78,29 +224,45 @@ int main(int argc, char* argv[])
     res = libusb_init(NULL);
     if (res != 0) {
         printf("failed to initialise libusb: %s\n", libusb_error_name(res));
-        return 1;
+        res = 1;
+        goto out1;
+    }
+
+    vdp_res = vdp_usb_init(stdout, vdp_log_debug, &ctx);
+    if (vdp_res != vdp_usb_success) {
+        printf("failed to initialise vdpusb: %s\n", vdp_usb_result_to_str(vdp_res));
+        res = 1;
+        goto out2;
+    }
+
+    for (i = 0; i < sizeof(vdp_devs)/sizeof(vdp_devs[0]); ++i) {
+        vdp_res = vdp_usb_device_open(ctx, i, &vdp_devs[i]);
+        if (vdp_res != vdp_usb_success) {
+            res = 1;
+            goto out3;
+        }
     }
 
     if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
         printf("libusb hotplug capabilites are not supported on this platform\n");
-        libusb_exit(NULL);
-        return 1;
+        res = 1;
+        goto out3;
     }
 
     res = libusb_hotplug_register_callback(NULL, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED, 0, vendor_id,
         product_id, LIBUSB_HOTPLUG_MATCH_ANY, hotplug_callback_attach, NULL, &hp[0]);
     if (res != LIBUSB_SUCCESS) {
         printf("error registering callback 0\n");
-        libusb_exit(NULL);
-        return 1;
+        res = 1;
+        goto out3;
     }
 
     res = libusb_hotplug_register_callback(NULL, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT, 0, vendor_id,
         product_id, LIBUSB_HOTPLUG_MATCH_ANY, hotplug_callback_detach, NULL, &hp[1]);
     if (res != LIBUSB_SUCCESS) {
         printf("error registering callback 1\n");
-        libusb_exit(NULL);
-        return 1;
+        res = 1;
+        goto out3;
     }
 
     printf("waiting for %04x:%04x\n", vendor_id, product_id);
@@ -108,7 +270,7 @@ int main(int argc, char* argv[])
     cnt = libusb_get_device_list(NULL, &devs);
     if (cnt > 0) {
         libusb_device* dev;
-        int i = 0;
+        i = 0;
 
         while ((dev = devs[i++]) != NULL) {
             struct libusb_device_descriptor desc;
@@ -129,7 +291,24 @@ int main(int argc, char* argv[])
         }
     }
 
-    libusb_exit(NULL);
+    for (i = 0; i < sizeof(proxy_devs)/sizeof(proxy_devs[0]); ++i) {
+        if (proxy_devs[i]) {
+            proxy_device_destroy(proxy_devs[i]);
+        }
+    }
 
-    return 0;
+    res = 0;
+
+out3:
+    for (i = 0; i < sizeof(vdp_devs)/sizeof(vdp_devs[0]); ++i) {
+        if (vdp_devs[i]) {
+            vdp_usb_device_close(vdp_devs[i]);
+        }
+    }
+    vdp_usb_cleanup(ctx);
+out2:
+    libusb_exit(NULL);
+out1:
+
+    return res;
 }
