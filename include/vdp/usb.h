@@ -151,12 +151,15 @@ struct vdp_usb_signal
     vdp_usb_signal_type type;
 };
 
+/*
+ * Same as VDP_USB_ENDPOINT_XFER_XXX.
+ */
 typedef enum
 {
     vdp_usb_urb_control = 0,
-    vdp_usb_urb_bulk = 1,
-    vdp_usb_urb_int = 2,
-    vdp_usb_urb_iso = 3
+    vdp_usb_urb_iso = 1,
+    vdp_usb_urb_bulk = 2,
+    vdp_usb_urb_int = 3
 } vdp_usb_urb_type;
 
 const char* vdp_usb_urb_type_to_str(vdp_usb_urb_type urb_type);

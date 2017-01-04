@@ -102,8 +102,42 @@ static void ep0_enable(struct vdp_usb_gadget_ep* ep, int value)
 
 static void ep0_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
 {
-    printf("ep0 enqueue %u\n", request->id);
-    request->status = vdp_usb_urb_status_completed;
+    request->status = vdp_usb_urb_status_stall;
+
+    if (ep->stalled) {
+        request->complete(request);
+        request->destroy(request);
+        return;
+    }
+
+    if (request->setup_packet.request == VDP_USB_REQUEST_GET_DESCRIPTOR) {
+        if ((request->setup_packet.type == vdp_usb_gadget_request_standard) &&
+            (request->setup_packet.recipient == vdp_usb_gadget_request_interface) &&
+            request->in) {
+            switch (request->setup_packet.value >> 8) {
+            case VDP_USB_HID_DT_REPORT:
+                printf("ep0 get_hid_report_descriptor %u\n", request->id);
+                request->actual_length = vdp_min(request->transfer_length, sizeof(test_report_descriptor));
+                memcpy(request->transfer_buffer, test_report_descriptor, request->actual_length);
+                request->status = vdp_usb_urb_status_completed;
+                break;
+            default:
+                break;
+            }
+        }
+    } else if (request->setup_packet.request == VDP_USB_HID_REQUEST_SET_IDLE) {
+        if ((request->setup_packet.type == vdp_usb_gadget_request_class) &&
+            (request->setup_packet.recipient == vdp_usb_gadget_request_interface) &&
+            !request->in) {
+            printf("ep0 set_idle %u\n", request->id);
+            request->status = vdp_usb_urb_status_completed;
+        }
+    }
+
+    if (request->status == vdp_usb_urb_status_stall) {
+        printf("ep0 %u stalled\n", request->id);
+    }
+
     request->complete(request);
     request->destroy(request);
 }
@@ -111,7 +145,7 @@ static void ep0_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_requ
 static void ep0_dequeue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
 {
     printf("ep0 dequeue %u\n", request->id);
-    request->status = vdp_usb_urb_status_completed;
+    request->status = vdp_usb_urb_status_unlinked;
     request->complete(request);
     request->destroy(request);
 }
@@ -134,8 +168,40 @@ static void ep1_enable(struct vdp_usb_gadget_ep* ep, int value)
 
 static void ep1_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
 {
-    printf("ep1 enqueue %u\n", request->id);
-    request->status = vdp_usb_urb_status_completed;
+    request->status = vdp_usb_urb_status_stall;
+
+    if (ep->stalled) {
+        request->complete(request);
+        request->destroy(request);
+        return;
+    }
+
+    if (request->transfer_length >= 8) {
+        printf("ep1 %u\n", request->id);
+
+        usleep(request->interval_us);
+
+        request->transfer_buffer[0] = 0;
+        request->transfer_buffer[1] = 0;
+        request->transfer_buffer[2] = 0;
+        request->transfer_buffer[3] = 0;
+
+        // X:
+        request->transfer_buffer[4] = 0;
+        request->transfer_buffer[5] = 0;
+
+        // Y:
+        request->transfer_buffer[6] = 0;
+        request->transfer_buffer[7] = 0;
+
+        request->actual_length = 8;
+        request->status = vdp_usb_urb_status_completed;
+    }
+
+    if (request->status == vdp_usb_urb_status_stall) {
+        printf("ep1 %u stalled\n", request->id);
+    }
+
     request->complete(request);
     request->destroy(request);
 }
@@ -143,7 +209,7 @@ static void ep1_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_requ
 static void ep1_dequeue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
 {
     printf("ep1 dequeue %u\n", request->id);
-    request->status = vdp_usb_urb_status_completed;
+    request->status = vdp_usb_urb_status_unlinked;
     request->complete(request);
     request->destroy(request);
 }

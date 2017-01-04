@@ -42,6 +42,17 @@ static int ptr_array_count(void** arr)
     return cnt;
 }
 
+struct vdp_usb_gadget_epi;
+
+struct vdp_usb_gadget_requesti
+{
+    struct vdp_usb_gadget_request request;
+
+    struct vdp_usb_urb* urb;
+
+    struct vdp_usb_gadget_epi* epi;
+};
+
 struct vdp_usb_gadget_epi
 {
     struct vdp_usb_gadget_ep ep;
@@ -51,6 +62,179 @@ struct vdp_usb_gadget_epi
     struct vdp_usb_endpoint_descriptor descriptor_in;
     struct vdp_usb_endpoint_descriptor descriptor_out;
 };
+
+static vdp_usb_result vdp_usb_gadget_request_complete(struct vdp_usb_gadget_request* request)
+{
+    struct vdp_usb_gadget_requesti* requesti;
+    vdp_usb_result res;
+    vdp_u32 i;
+
+    assert(request);
+
+    requesti = vdp_containerof(request, struct vdp_usb_gadget_requesti, request);
+
+    requesti->urb->actual_length = request->actual_length;
+    requesti->urb->status = request->status;
+
+    res = vdp_usb_complete_urb(requesti->urb);
+
+    if (res == vdp_usb_success) {
+        if (request->status == vdp_usb_urb_status_stall) {
+            if (requesti->epi->ep.active) {
+                requesti->epi->ep.stalled = 1;
+            }
+        } else if (requesti->urb->type == vdp_usb_urb_iso) {
+            for (i = 0; i < requesti->urb->number_of_packets; ++i) {
+                if (requesti->urb->iso_packets[i].status == vdp_usb_urb_status_stall) {
+                    if (requesti->epi->ep.active) {
+                        requesti->epi->ep.stalled = 1;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    return res;
+}
+
+static void vdp_usb_gadget_request_destroy(struct vdp_usb_gadget_request* request)
+{
+    struct vdp_usb_gadget_requesti* requesti;
+
+    assert(request);
+
+    requesti = vdp_containerof(request, struct vdp_usb_gadget_requesti, request);
+
+    vdp_list_remove(&request->entry);
+
+    vdp_usb_free_urb(requesti->urb);
+
+    free(requesti);
+}
+
+static void vdp_usb_gadget_ep_activate(struct vdp_usb_gadget_ep* ep, int value)
+{
+    struct vdp_usb_gadget_epi* epi;
+
+    value = !!value;
+
+    if (!ep || (ep->active == value)) {
+        return;
+    }
+
+    epi = vdp_containerof(ep, struct vdp_usb_gadget_epi, ep);
+
+    if (value) {
+        ep->active = 1;
+        epi->ops.enable(ep, 1);
+    } else {
+        epi->ops.enable(ep, 0);
+        ep->active = 0;
+        ep->stalled = 0;
+    }
+}
+
+static void vdp_usb_gadget_ep_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_urb* urb)
+{
+    struct vdp_usb_gadget_epi* epi;
+    struct vdp_usb_gadget_requesti* requesti;
+
+    if (!ep) {
+        goto fail;
+    }
+
+    epi = vdp_containerof(ep, struct vdp_usb_gadget_epi, ep);
+
+    assert(ep->active);
+    assert(ep->caps.address == VDP_USB_URB_ENDPOINT_NUMBER(urb->endpoint_address));
+
+    if ((int)urb->type != (int)ep->caps.type) {
+        goto fail;
+    }
+
+    if (ep->caps.type != vdp_usb_gadget_ep_control) {
+        if (VDP_USB_URB_ENDPOINT_IN(urb->endpoint_address) && ((ep->caps.dir & vdp_usb_gadget_ep_in) == 0)) {
+            goto fail;
+        }
+        if (VDP_USB_URB_ENDPOINT_OUT(urb->endpoint_address) && ((ep->caps.dir & vdp_usb_gadget_ep_out) == 0)) {
+            goto fail;
+        }
+    } else {
+        if (VDP_USB_REQUESTTYPE_IN(urb->setup_packet->bRequestType) && !VDP_USB_URB_ENDPOINT_IN(urb->endpoint_address)) {
+            goto fail;
+        }
+        if (VDP_USB_REQUESTTYPE_OUT(urb->setup_packet->bRequestType) && !VDP_USB_URB_ENDPOINT_OUT(urb->endpoint_address)) {
+            goto fail;
+        }
+    }
+
+    requesti = malloc(sizeof(*requesti));
+
+    if (requesti == NULL) {
+        goto fail;
+    }
+
+    memset(requesti, 0, sizeof(*requesti));
+
+    vdp_list_init(&requesti->request.entry);
+    requesti->request.id = urb->id;
+    requesti->request.in = !!VDP_USB_URB_ENDPOINT_IN(urb->endpoint_address);
+    requesti->request.flags = urb->flags;
+    requesti->request.transfer_buffer = urb->transfer_buffer;
+    requesti->request.transfer_length = urb->transfer_length;
+    requesti->request.actual_length = urb->actual_length;
+    requesti->request.number_of_packets = urb->number_of_packets;
+    requesti->request.interval_us = urb->interval;
+    requesti->request.status = urb->status;
+    requesti->request.iso_packets = urb->iso_packets;
+
+    if (ep->caps.type == vdp_usb_gadget_ep_control) {
+        requesti->request.setup_packet.type = VDP_USB_REQUESTTYPE_TYPE(urb->setup_packet->bRequestType);
+        requesti->request.setup_packet.recipient = VDP_USB_REQUESTTYPE_RECIPIENT(urb->setup_packet->bRequestType);
+        requesti->request.setup_packet.request = urb->setup_packet->bRequest;
+        requesti->request.setup_packet.value = vdp_u16le_to_cpu(urb->setup_packet->wValue);
+        requesti->request.setup_packet.index = vdp_u16le_to_cpu(urb->setup_packet->wIndex);
+    }
+
+    requesti->request.complete = &vdp_usb_gadget_request_complete;
+    requesti->request.destroy = &vdp_usb_gadget_request_destroy;
+
+    requesti->urb = urb;
+    requesti->epi = epi;
+
+    vdp_list_add_tail(&ep->requests, &requesti->request.entry);
+
+    epi->ops.enqueue(ep, &requesti->request);
+
+    return;
+
+fail:
+    urb->status = vdp_usb_urb_status_error;
+    vdp_usb_complete_urb(urb);
+    vdp_usb_free_urb(urb);
+}
+
+static int vdp_usb_gadget_ep_dequeue(struct vdp_usb_gadget_ep* ep, vdp_u32 id)
+{
+    struct vdp_usb_gadget_epi* epi;
+    struct vdp_usb_gadget_request* request;
+
+    if (!ep) {
+        return 0;
+    }
+
+    epi = vdp_containerof(ep, struct vdp_usb_gadget_epi, ep);
+
+    vdp_list_for_each(struct vdp_usb_gadget_request, request, &ep->requests, entry) {
+        if (request->id == id) {
+            epi->ops.dequeue(ep, request);
+            return 1;
+        }
+    }
+
+    return 0;
+}
 
 struct vdp_usb_gadget_ep* vdp_usb_gadget_ep_create(const struct vdp_usb_gadget_ep_caps* caps,
     const struct vdp_usb_gadget_ep_ops* ops, void* priv)
@@ -112,6 +296,7 @@ void vdp_usb_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep)
 
     vdp_list_for_each_safe(struct vdp_usb_gadget_request,
         request, next, &epi->ep.requests, entry) {
+        request->status = vdp_usb_urb_status_unlinked;
         request->complete(request);
         request->destroy(request);
     }
@@ -129,6 +314,74 @@ struct vdp_usb_gadget_interfacei
 
     struct vdp_usb_interface_descriptor descriptor;
 };
+
+static int vdp_usb_gadget_interface_enqueue(struct vdp_usb_gadget_interface* interface, struct vdp_usb_urb* urb)
+{
+    int i;
+    vdp_u32 address;
+
+    if (!interface || !interface->active) {
+        return 0;
+    }
+
+    address = VDP_USB_URB_ENDPOINT_NUMBER(urb->endpoint_address);
+
+    for (i = 0; interface->caps.endpoints[i]; ++i) {
+        if (interface->caps.endpoints[i]->caps.address == address) {
+            vdp_usb_gadget_ep_enqueue(interface->caps.endpoints[i], urb);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static int vdp_usb_gadget_interface_dequeue(struct vdp_usb_gadget_interface* interface, vdp_u32 id)
+{
+    int i;
+
+    if (!interface) {
+        return 0;
+    }
+
+    for (i = 0; interface->caps.endpoints[i]; ++i) {
+        if (vdp_usb_gadget_ep_dequeue(interface->caps.endpoints[i], id)) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static void vdp_usb_gadget_interface_activate(struct vdp_usb_gadget_interface* interface, int value)
+{
+    struct vdp_usb_gadget_interfacei* interfacei;
+    int i;
+
+    value = !!value;
+
+    if (!interface || (interface->active == value)) {
+        return;
+    }
+
+    interfacei = vdp_containerof(interface, struct vdp_usb_gadget_interfacei, interface);
+
+    if (value) {
+        interface->active = 1;
+        interfacei->ops.enable(interface, 1);
+
+        for (i = 0; interface->caps.endpoints[i]; ++i) {
+            vdp_usb_gadget_ep_activate(interface->caps.endpoints[i], 1);
+        }
+    } else {
+        for (i = 0; interface->caps.endpoints[i]; ++i) {
+            vdp_usb_gadget_ep_activate(interface->caps.endpoints[i], 0);
+        }
+
+        interfacei->ops.enable(interface, 0);
+        interface->active = 0;
+    }
+}
 
 struct vdp_usb_gadget_interface* vdp_usb_gadget_interface_create(const struct vdp_usb_gadget_interface_caps* caps,
     const struct vdp_usb_gadget_interface_ops* ops, void* priv)
@@ -253,6 +506,38 @@ struct vdp_usb_gadget_configi
 
     struct vdp_usb_descriptor_header** other;
 };
+
+static void vdp_usb_gadget_config_activate(struct vdp_usb_gadget_config* config, int value)
+{
+    struct vdp_usb_gadget_configi* configi;
+    int i;
+
+    value = !!value;
+
+    if (!config || (config->active == value)) {
+        return;
+    }
+
+    configi = vdp_containerof(config, struct vdp_usb_gadget_configi, config);
+
+    if (value) {
+        config->active = 1;
+        configi->ops.enable(config, 1);
+
+        for (i = 0; config->caps.interfaces[i]; ++i) {
+            if (config->caps.interfaces[i]->caps.alt_setting == 0) {
+                vdp_usb_gadget_interface_activate(config->caps.interfaces[i], 1);
+            }
+        }
+    } else {
+        for (i = 0; config->caps.interfaces[i]; ++i) {
+            vdp_usb_gadget_interface_activate(config->caps.interfaces[i], 0);
+        }
+
+        configi->ops.enable(config, 0);
+        config->active = 0;
+    }
+}
 
 struct vdp_usb_gadget_config* vdp_usb_gadget_config_create(const struct vdp_usb_gadget_config_caps* caps,
     const struct vdp_usb_gadget_config_ops* ops, void* priv)
@@ -462,40 +747,19 @@ static vdp_usb_urb_status gadget_set_address(void* user_data,
     return vdp_usb_urb_status_completed;
 }
 
-static int gadget_reset_configuration(struct vdp_usb_gadgeti* gadgeti, int new_index)
+static int gadget_reset_configuration(struct vdp_usb_gadget* gadget, int new_index)
 {
-    int i, j;
+    int i;
 
-    for (i = 0; gadgeti->gadget.caps.configs[i]; ++i) {
-        struct vdp_usb_gadget_configi* configi = vdp_containerof(gadgeti->gadget.caps.configs[i],
-            struct vdp_usb_gadget_configi, config);
-        if (!configi->config.active) {
-            continue;
-        }
-        if (i == new_index) {
-            return 0;
-        }
-
-        for (i = 0; configi->config.caps.interfaces[i]; ++i) {
-            struct vdp_usb_gadget_interfacei* interfacei = vdp_containerof(configi->config.caps.interfaces[i],
-                struct vdp_usb_gadget_interfacei, interface);
-            if (interfacei->interface.active) {
-                for (j = 0; interfacei->interface.caps.endpoints[j]; ++j) {
-                    struct vdp_usb_gadget_epi* epi = vdp_containerof(interfacei->interface.caps.endpoints[j],
-                        struct vdp_usb_gadget_epi, ep);
-                    epi->ops.enable(&epi->ep, 0);
-                    epi->ep.active = 0;
-                    epi->ep.stalled = 0;
-                }
-
-                interfacei->ops.enable(&interfacei->interface, 0);
-                interfacei->interface.active = 0;
+    for (i = 0; gadget->caps.configs[i]; ++i) {
+        if (gadget->caps.configs[i]->active) {
+            if (i == new_index) {
+                return 0;
             }
-        }
 
-        configi->ops.enable(&configi->config, 0);
-        configi->config.active = 0;
-        break;
+            vdp_usb_gadget_config_activate(gadget->caps.configs[i], 0);
+            break;
+        }
     }
 
     return 1;
@@ -504,35 +768,18 @@ static int gadget_reset_configuration(struct vdp_usb_gadgeti* gadgeti, int new_i
 static vdp_usb_urb_status gadget_set_configuration(void* user_data,
     vdp_u8 configuration)
 {
-    int i, j;
+    int i;
     struct vdp_usb_gadgeti* gadgeti = user_data;
 
     for (i = 0; gadgeti->gadget.caps.configs[i]; ++i) {
         struct vdp_usb_gadget_configi* configi = vdp_containerof(gadgeti->gadget.caps.configs[i],
             struct vdp_usb_gadget_configi, config);
         if (configi->descriptor.bConfigurationValue == configuration) {
-            if (!gadget_reset_configuration(gadgeti, i)) {
+            if (!gadget_reset_configuration(&gadgeti->gadget, i)) {
                 return vdp_usb_urb_status_completed;
             }
 
-            configi->config.active = 1;
-            configi->ops.enable(&configi->config, 1);
-
-            for (i = 0; configi->config.caps.interfaces[i]; ++i) {
-                struct vdp_usb_gadget_interfacei* interfacei = vdp_containerof(configi->config.caps.interfaces[i],
-                    struct vdp_usb_gadget_interfacei, interface);
-                if (interfacei->interface.caps.alt_setting == 0) {
-                    interfacei->interface.active = 1;
-                    interfacei->ops.enable(&interfacei->interface, 1);
-
-                    for (j = 0; interfacei->interface.caps.endpoints[j]; ++j) {
-                        struct vdp_usb_gadget_epi* epi = vdp_containerof(interfacei->interface.caps.endpoints[j],
-                            struct vdp_usb_gadget_epi, ep);
-                        epi->ep.active = 1;
-                        epi->ops.enable(&epi->ep, 1);
-                    }
-                }
-            }
+            vdp_usb_gadget_config_activate(&configi->config, 1);
 
             return vdp_usb_urb_status_completed;
         }
@@ -679,6 +926,7 @@ fail1:
 void vdp_usb_gadget_event(struct vdp_usb_gadget* gadget, struct vdp_usb_event* event)
 {
     struct vdp_usb_gadgeti* gadgeti;
+    int i;
 
     if (!gadget) {
         return;
@@ -694,32 +942,21 @@ void vdp_usb_gadget_event(struct vdp_usb_gadget* gadget, struct vdp_usb_event* e
         switch (event->data.signal.type) {
         case vdp_usb_signal_reset_start:
             gadgeti->ops.reset(gadget, 1);
-            gadget_reset_configuration(gadgeti, -1);
-            if (gadgeti->endpoint0i->ep.active) {
-                gadgeti->endpoint0i->ops.enable(&gadgeti->endpoint0i->ep, 0);
-                gadgeti->endpoint0i->ep.active = 0;
-                gadgeti->endpoint0i->ep.stalled = 0;
-            }
+            gadget_reset_configuration(gadget, -1);
+            vdp_usb_gadget_ep_activate(&gadgeti->endpoint0i->ep, 0);
             gadgeti->gadget.address = 0;
             break;
         case vdp_usb_signal_reset_end:
             gadgeti->ops.reset(gadget, 0);
-            if (!gadgeti->endpoint0i->ep.active) {
-                gadgeti->endpoint0i->ep.active = 1;
-                gadgeti->endpoint0i->ops.enable(&gadgeti->endpoint0i->ep, 1);
-            }
+            vdp_usb_gadget_ep_activate(&gadgeti->endpoint0i->ep, 1);
             break;
         case vdp_usb_signal_power_on:
             gadgeti->ops.power(gadget, 1);
             break;
         case vdp_usb_signal_power_off:
             gadgeti->ops.power(gadget, 0);
-            gadget_reset_configuration(gadgeti, -1);
-            if (gadgeti->endpoint0i->ep.active) {
-                gadgeti->endpoint0i->ops.enable(&gadgeti->endpoint0i->ep, 0);
-                gadgeti->endpoint0i->ep.active = 0;
-                gadgeti->endpoint0i->ep.stalled = 0;
-            }
+            gadget_reset_configuration(gadget, -1);
+            vdp_usb_gadget_ep_activate(&gadgeti->endpoint0i->ep, 0);
             gadgeti->gadget.address = 0;
             break;
         default:
@@ -729,6 +966,8 @@ void vdp_usb_gadget_event(struct vdp_usb_gadget* gadget, struct vdp_usb_event* e
         break;
     }
     case vdp_usb_event_urb: {
+        int enqueued = 0;
+
         if (!gadgeti->endpoint0i->ep.active) {
             event->data.urb->status = vdp_usb_urb_status_error;
             vdp_usb_complete_urb(event->data.urb);
@@ -736,20 +975,62 @@ void vdp_usb_gadget_event(struct vdp_usb_gadget* gadget, struct vdp_usb_event* e
             break;
         }
 
-        if (!vdp_usb_filter(event->data.urb, &gadget_filter_ops, gadgeti)) {
-            event->data.urb->status = vdp_usb_urb_status_completed;
+        if (vdp_usb_filter(event->data.urb, &gadget_filter_ops, gadgeti)) {
+            vdp_usb_complete_urb(event->data.urb);
+            vdp_usb_free_urb(event->data.urb);
+            break;
         }
-        vdp_usb_complete_urb(event->data.urb);
-        vdp_usb_free_urb(event->data.urb);
+
+        if (VDP_USB_URB_ENDPOINT_NUMBER(event->data.urb->endpoint_address) == 0) {
+            vdp_usb_gadget_ep_enqueue(&gadgeti->endpoint0i->ep, event->data.urb);
+            break;
+        }
+
+        for (i = 0; gadget->caps.configs[i]; ++i) {
+            struct vdp_usb_gadget_config* cfg = gadget->caps.configs[i];
+            if (cfg->active) {
+                for (i = 0; cfg->caps.interfaces[i]; ++i) {
+                    if (vdp_usb_gadget_interface_enqueue(cfg->caps.interfaces[i], event->data.urb)) {
+                        enqueued = 1;
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+
+        if (!enqueued) {
+            event->data.urb->status = vdp_usb_urb_status_error;
+            vdp_usb_complete_urb(event->data.urb);
+            vdp_usb_free_urb(event->data.urb);
+        }
+
         break;
     }
     case vdp_usb_event_unlink_urb: {
+        int j, dequeued = 0;
+
         if (!gadgeti->endpoint0i->ep.active) {
             event->data.urb->status = vdp_usb_urb_status_error;
             vdp_usb_complete_urb(event->data.urb);
             vdp_usb_free_urb(event->data.urb);
             break;
         }
+
+        if (vdp_usb_gadget_ep_dequeue(&gadgeti->endpoint0i->ep, event->data.unlink_urb.id)) {
+            break;
+        }
+
+        for (i = 0; !dequeued && gadget->caps.configs[i]; ++i) {
+            struct vdp_usb_gadget_config* cfg = gadget->caps.configs[i];
+            for (j = 0; cfg->caps.interfaces[j]; ++j) {
+                if (vdp_usb_gadget_interface_dequeue(cfg->caps.interfaces[j], event->data.unlink_urb.id)) {
+                    dequeued = 1;
+                    break;
+                }
+            }
+        }
+
         break;
     }
     default:
