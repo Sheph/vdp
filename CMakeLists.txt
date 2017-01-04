@@ -52,6 +52,10 @@ set(VDP_INCLUDE_DIR "${VDP_SOURCE_DIR}/include")
 include_directories(${VDP_INCLUDE_DIR})
 include_directories(${VDP_INCLUDE_DIR}/libusb-1.0)
 
+#find packages
+
+find_package(Threads)
+
 #fix output directories
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${VDP_OUT_DIR}/lib)
