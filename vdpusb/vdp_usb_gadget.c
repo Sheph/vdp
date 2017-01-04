@@ -578,7 +578,7 @@ struct vdp_usb_gadget_config* vdp_usb_gadget_config_create(const struct vdp_usb_
 
     configi->descriptor.bLength = sizeof(configi->descriptor);
     configi->descriptor.bDescriptorType = VDP_USB_DT_CONFIG;
-    configi->descriptor.bNumInterfaces = ptr_array_count((void**)caps->interfaces);
+    configi->descriptor.bNumInterfaces = 0;
     configi->descriptor.bConfigurationValue = caps->number;
     configi->descriptor.iConfiguration = caps->description;
     configi->descriptor.bmAttributes = caps->attributes;
@@ -594,6 +594,9 @@ struct vdp_usb_gadget_config* vdp_usb_gadget_config_create(const struct vdp_usb_
                 (ep->caps.dir == vdp_usb_gadget_ep_inout)) {
                 ++cnt;
             }
+        }
+        if (interface->caps.alt_setting == 0) {
+            ++configi->descriptor.bNumInterfaces;
         }
     }
 

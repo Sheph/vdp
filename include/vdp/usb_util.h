@@ -113,8 +113,8 @@ struct vdp_usb_interface_descriptor
 #define VDP_USB_ENDPOINT_XFER_BULK     2
 #define VDP_USB_ENDPOINT_XFER_INT      3
 
-#define VDP_USB_ENDPOINT_IN_ADDRESS(number) (((number) & 0x7F) | 0x80)
-#define VDP_USB_ENDPOINT_OUT_ADDRESS(number) (((number) & 0x7F) | 0x00)
+#define VDP_USB_ENDPOINT_IN_ADDRESS(number) (((number) & 0x0F) | 0x80)
+#define VDP_USB_ENDPOINT_OUT_ADDRESS(number) (((number) & 0x0F) | 0x00)
 
 struct vdp_usb_endpoint_descriptor
 {

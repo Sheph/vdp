@@ -46,29 +46,297 @@ struct proxy_device
     struct vdp_usb_gadget* gadget;
 };
 
-static struct vdp_usb_gadget_ep* create_proxy_gadget_ep(const struct libusb_endpoint_descriptor* desc)
+static void proxy_gadget_ep_enable(struct vdp_usb_gadget_ep* ep, int value)
 {
-    // TODO
-    return NULL;
+}
+
+static void proxy_gadget_ep_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
+{
+    request->status = vdp_usb_urb_status_completed;
+    request->complete(request);
+    request->destroy(request);
+}
+
+static void proxy_gadget_ep_dequeue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
+{
+    request->status = vdp_usb_urb_status_unlinked;
+    request->complete(request);
+    request->destroy(request);
+}
+
+static vdp_usb_urb_status proxy_gadget_ep_clear_stall(struct vdp_usb_gadget_ep* ep)
+{
+    return vdp_usb_urb_status_completed;
+}
+
+static void proxy_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep)
+{
+}
+
+static void proxy_gadget_interface_enable(struct vdp_usb_gadget_interface* interface, int value)
+{
+}
+
+static void proxy_gadget_interface_destroy(struct vdp_usb_gadget_interface* interface)
+{
+}
+
+static void proxy_gadget_config_enable(struct vdp_usb_gadget_config* config, int value)
+{
+}
+
+static void proxy_gadget_config_destroy(struct vdp_usb_gadget_config* config)
+{
+}
+
+static void proxy_gadget_reset(struct vdp_usb_gadget* gadget, int start)
+{
+}
+
+static void proxy_gadget_power(struct vdp_usb_gadget* gadget, int on)
+{
+}
+
+static void proxy_gadget_set_address(struct vdp_usb_gadget* gadget, vdp_u32 address)
+{
+}
+
+static void proxy_gadget_destroy(struct vdp_usb_gadget* gadget)
+{
+}
+
+static struct vdp_usb_gadget_ep* create_proxy_gadget_ep(const struct libusb_endpoint_descriptor* desc,
+    vdp_usb_gadget_ep_dir dir)
+{
+    static const struct vdp_usb_gadget_ep_ops ops =
+    {
+        .enable = proxy_gadget_ep_enable,
+        .enqueue = proxy_gadget_ep_enqueue,
+        .dequeue = proxy_gadget_ep_dequeue,
+        .clear_stall = proxy_gadget_ep_clear_stall,
+        .destroy = proxy_gadget_ep_destroy
+    };
+
+    struct vdp_usb_gadget_ep_caps caps;
+
+    memset(&caps, 0, sizeof(caps));
+
+    caps.address = VDP_USB_URB_ENDPOINT_NUMBER(desc->bEndpointAddress);
+    caps.dir = dir;
+    caps.type = desc->bmAttributes;
+    caps.max_packet_size = desc->wMaxPacketSize;
+    caps.interval = desc->bInterval;
+
+    return vdp_usb_gadget_ep_create(&caps, &ops, NULL);
 }
 
 static struct vdp_usb_gadget_interface* create_proxy_gadget_interface(const struct libusb_interface_descriptor* desc)
 {
-    // TODO
-    return NULL;
+    static const struct vdp_usb_gadget_interface_ops ops =
+    {
+        .enable = proxy_gadget_interface_enable,
+        .destroy = proxy_gadget_interface_destroy
+    };
+    struct vdp_usb_gadget_interface_caps caps;
+    uint8_t i, j, num_endpoints = 0;
+    struct vdp_usb_gadget_interface* interface = NULL;
+
+    memset(&caps, 0, sizeof(caps));
+
+    caps.number = desc->bInterfaceNumber;
+    caps.alt_setting = desc->bAlternateSetting;
+    caps.klass = desc->bInterfaceClass;
+    caps.subklass = desc->bInterfaceSubClass;
+    caps.protocol = desc->bInterfaceProtocol;
+    caps.description = desc->iInterface;
+    caps.descriptors = NULL;
+    caps.endpoints = malloc(sizeof(*caps.endpoints) * ((int)desc->bNumEndpoints + 1));
+
+    if (!caps.endpoints) {
+        return NULL;
+    }
+
+    for (i = 0; i < desc->bNumEndpoints; ++i) {
+        uint8_t number = VDP_USB_URB_ENDPOINT_NUMBER(desc->endpoint[i].bEndpointAddress);
+        int found = 0;
+
+        for (j = 0; j < num_endpoints; ++j) {
+            if (caps.endpoints[j]->caps.address == number) {
+                found = 1;
+                break;
+            }
+        }
+
+        if (found) {
+            continue;
+        }
+
+        vdp_usb_gadget_ep_dir dir = VDP_USB_URB_ENDPOINT_IN(desc->endpoint[i].bEndpointAddress) ?
+            vdp_usb_gadget_ep_in : vdp_usb_gadget_ep_out;
+
+        for (j = i + 1; j < desc->bNumEndpoints; ++j) {
+            if (VDP_USB_URB_ENDPOINT_NUMBER(desc->endpoint[j].bEndpointAddress) == number) {
+                dir |= VDP_USB_URB_ENDPOINT_IN(desc->endpoint[j].bEndpointAddress) ?
+                    vdp_usb_gadget_ep_in : vdp_usb_gadget_ep_out;
+            }
+        }
+
+        caps.endpoints[num_endpoints] = create_proxy_gadget_ep(&desc->endpoint[i], dir);
+        if (!caps.endpoints[num_endpoints]) {
+            goto out2;
+        }
+
+        ++num_endpoints;
+    }
+
+    caps.endpoints[num_endpoints] = NULL;
+
+    interface = vdp_usb_gadget_interface_create(&caps, &ops, NULL);
+
+    if (interface) {
+        goto out1;
+    }
+
+out2:
+    for (i = 0; i < num_endpoints; ++i) {
+        vdp_usb_gadget_ep_destroy(caps.endpoints[i]);
+    }
+out1:
+    free(caps.endpoints);
+
+    return interface;
 }
 
 static struct vdp_usb_gadget_config* create_proxy_gadget_config(const struct libusb_config_descriptor* desc)
 {
-    // TODO
-    return NULL;
+    static const struct vdp_usb_gadget_config_ops ops =
+    {
+        .enable = proxy_gadget_config_enable,
+        .destroy = proxy_gadget_config_destroy
+    };
+    struct vdp_usb_gadget_config_caps caps;
+    uint8_t i;
+    int num_interfaces = 0, j;
+    struct vdp_usb_gadget_config* config = NULL;
+
+    memset(&caps, 0, sizeof(caps));
+
+    for (i = 0; i < desc->bNumInterfaces; ++i) {
+        num_interfaces += desc->interface[i].num_altsetting;
+    }
+
+    caps.number = desc->bConfigurationValue;
+    caps.attributes = desc->bmAttributes;
+    caps.max_power = desc->MaxPower;
+    caps.description = desc->iConfiguration;
+    caps.interfaces = malloc(sizeof(*caps.interfaces) * (num_interfaces + 1));
+
+    if (!caps.interfaces) {
+        return NULL;
+    }
+
+    num_interfaces = 0;
+
+    for (i = 0; i < desc->bNumInterfaces; ++i) {
+        for (j = 0; j < desc->interface[i].num_altsetting; ++j) {
+            caps.interfaces[num_interfaces] = create_proxy_gadget_interface(&desc->interface[i].altsetting[j]);
+            if (!caps.interfaces[num_interfaces]) {
+                goto out2;
+            }
+            ++num_interfaces;
+        }
+    }
+
+    caps.interfaces[num_interfaces] = NULL;
+
+    config = vdp_usb_gadget_config_create(&caps, &ops, NULL);
+
+    if (config) {
+        goto out1;
+    }
+
+out2:
+    for (j = 0; j < num_interfaces; ++j) {
+        vdp_usb_gadget_interface_destroy(caps.interfaces[j]);
+    }
+out1:
+    free(caps.interfaces);
+
+    return config;
 }
 
 static struct vdp_usb_gadget* create_proxy_gadget(const struct libusb_device_descriptor* dev_desc,
     struct libusb_config_descriptor** config_descs)
 {
-    // TODO
-    return NULL;
+    static const struct vdp_usb_gadget_ops ops =
+    {
+        .reset = proxy_gadget_reset,
+        .power = proxy_gadget_power,
+        .set_address = proxy_gadget_set_address,
+        .destroy = proxy_gadget_destroy
+    };
+    struct vdp_usb_gadget_caps caps;
+    struct libusb_endpoint_descriptor ep0_desc;
+    uint8_t i, num_configs = 0;
+    struct vdp_usb_gadget* gadget = NULL;
+
+    memset(&caps, 0, sizeof(caps));
+    memset(&ep0_desc, 0, sizeof(ep0_desc));
+
+    ep0_desc.bEndpointAddress = 0;
+    ep0_desc.bmAttributes = VDP_USB_ENDPOINT_XFER_CONTROL;
+    ep0_desc.wMaxPacketSize = dev_desc->bMaxPacketSize0;
+    ep0_desc.bInterval = 0;
+
+    caps.bcd_usb = dev_desc->bcdUSB;
+    caps.bcd_device = dev_desc->bcdDevice;
+    caps.klass = dev_desc->bDeviceClass;
+    caps.subklass = dev_desc->bDeviceSubClass;
+    caps.protocol = dev_desc->bDeviceProtocol;
+    caps.vendor_id = dev_desc->idVendor;
+    caps.product_id = dev_desc->idProduct;
+    caps.manufacturer = dev_desc->iManufacturer;
+    caps.product = dev_desc->iProduct;
+    caps.serial_number = dev_desc->iSerialNumber;
+    caps.string_tables = NULL;
+    caps.configs = malloc(sizeof(*caps.configs) * ((int)dev_desc->bNumConfigurations + 1));
+
+    if (!caps.configs) {
+        return NULL;
+    }
+
+    caps.endpoint0 = create_proxy_gadget_ep(&ep0_desc, vdp_usb_gadget_ep_inout);
+
+    if (!caps.endpoint0) {
+        goto out1;
+    }
+
+    for (i = 0; i < dev_desc->bNumConfigurations; ++i) {
+        caps.configs[num_configs] = create_proxy_gadget_config(config_descs[i]);
+        if (!caps.configs[num_configs]) {
+            goto out2;
+        }
+
+        ++num_configs;
+    }
+
+    caps.configs[num_configs] = NULL;
+
+    gadget = vdp_usb_gadget_create(&caps, &ops, NULL);
+
+    if (gadget) {
+        goto out1;
+    }
+
+out2:
+    for (i = 0; i < num_configs; ++i) {
+        vdp_usb_gadget_config_destroy(caps.configs[i]);
+    }
+    vdp_usb_gadget_ep_destroy(caps.endpoint0);
+out1:
+    free(caps.configs);
+
+    return gadget;
 }
 
 static struct proxy_device* proxy_device_create(libusb_device_handle* handle)
@@ -145,6 +413,7 @@ static void proxy_device_destroy(struct proxy_device* proxy)
 static int hotplug_callback_attach(libusb_context* ctx, libusb_device* dev, libusb_hotplug_event event, void* user_data)
 {
     int i;
+    vdp_usb_result vdp_res;
 
     printf("device attached: %d:%d\n",
         libusb_get_bus_number(dev), libusb_get_port_number(dev));
@@ -163,6 +432,14 @@ static int hotplug_callback_attach(libusb_context* ctx, libusb_device* dev, libu
             proxy_devs[i] = proxy_device_create(handle);
             if (!proxy_devs[i]) {
                 libusb_close(handle);
+                break;
+            }
+
+            vdp_res = vdp_usb_device_attach(vdp_devs[i]);
+            if (vdp_res != vdp_usb_success) {
+                printf("failed to attach device: %s\n", vdp_usb_result_to_str(vdp_res));
+                proxy_device_destroy(proxy_devs[i]);
+                proxy_devs[i] = NULL;
             }
 
             break;
@@ -186,6 +463,7 @@ static int hotplug_callback_detach(libusb_context* ctx, libusb_device* dev, libu
                 (libusb_get_port_number(dev) == libusb_get_port_number(other_dev))) {
                 proxy_device_destroy(proxy_devs[i]);
                 proxy_devs[i] = NULL;
+                vdp_usb_device_detach(vdp_devs[i]);
                 break;
             }
         }
@@ -294,6 +572,7 @@ int main(int argc, char* argv[])
     for (i = 0; i < sizeof(proxy_devs)/sizeof(proxy_devs[0]); ++i) {
         if (proxy_devs[i]) {
             proxy_device_destroy(proxy_devs[i]);
+            vdp_usb_device_detach(vdp_devs[i]);
         }
     }
 
