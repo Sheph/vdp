@@ -818,6 +818,8 @@ int vdphci_hcd_add(struct device* controller,
     if (ret != 0) {
         usb_put_hcd(*hcd);
         *hcd = 0;
+    } else {
+        print_info("%s/%d added\n", (*hcd)->self.bus_name, (*hcd)->self.busnum);
     }
 
     return ret;
@@ -825,6 +827,7 @@ int vdphci_hcd_add(struct device* controller,
 
 void vdphci_hcd_remove(struct usb_hcd* hcd)
 {
+    print_info("%s/%d removed\n", hcd->self.bus_name, hcd->self.busnum);
     usb_remove_hcd(hcd);
     usb_put_hcd(hcd);
 }

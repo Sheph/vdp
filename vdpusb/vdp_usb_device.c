@@ -80,6 +80,7 @@ vdp_usb_result vdp_usb_device_open(struct vdp_usb_context* context,
 {
     char device_path[255];
     int error;
+    struct vdphci_info info = { 0, 0 };
 
     assert(context && device);
     if (!context || !device) {
@@ -131,6 +132,19 @@ vdp_usb_result vdp_usb_device_open(struct vdp_usb_context* context,
             return vdp_usb_unknown;
         }
     }
+
+    if (ioctl((*device)->fd, VDPHCI_IOC_GET_INFO, &info) == -1) {
+        VDP_USB_LOG_ERROR(context, "device %d does not accept info ioctl", device_number);
+
+        close((*device)->fd);
+        free(*device);
+        *device = NULL;
+
+        return vdp_usb_protocol_error;
+    }
+
+    (*device)->busnum = info.busnum;
+    (*device)->portnum = info.portnum;
 
     VDP_USB_LOG_DEBUG(context, "device %d opened", device_number);
 
@@ -218,6 +232,26 @@ vdp_usb_result vdp_usb_device_detach(struct vdp_usb_device* device)
 
         return vdp_usb_success;
     }
+}
+
+int vdp_usb_device_get_busnum(struct vdp_usb_device* device)
+{
+    assert(device);
+    if (!device) {
+        return 0;
+    }
+
+    return device->busnum;
+}
+
+int vdp_usb_device_get_portnum(struct vdp_usb_device* device)
+{
+    assert(device);
+    if (!device) {
+        return 0;
+    }
+
+    return device->portnum;
 }
 
 vdp_usb_result vdp_usb_device_wait_event(struct vdp_usb_device* device, vdp_fd* fd)

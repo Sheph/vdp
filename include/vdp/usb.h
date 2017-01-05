@@ -119,6 +119,9 @@ vdp_usb_result vdp_usb_device_attach(struct vdp_usb_device* device);
  */
 vdp_usb_result vdp_usb_device_detach(struct vdp_usb_device* device);
 
+int vdp_usb_device_get_busnum(struct vdp_usb_device* device);
+int vdp_usb_device_get_portnum(struct vdp_usb_device* device);
+
 /*
  * @}
  */

@@ -37,6 +37,9 @@ struct vdp_usb_device
     vdp_u8 device_number;
 
     vdp_fd fd;
+
+    int busnum;
+    int portnum;
 };
 
 #endif

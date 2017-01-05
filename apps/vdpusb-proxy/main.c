@@ -33,12 +33,14 @@
 #include <errno.h>
 #include <assert.h>
 #include <signal.h>
+#include <poll.h>
 
 struct proxy_device;
 
 static int done = 0;
 static struct vdp_usb_device* vdp_devs[5];
 static struct proxy_device* proxy_devs[5];
+static int vdp_busnum = -1;
 
 struct proxy_device
 {
@@ -48,10 +50,12 @@ struct proxy_device
 
 static void proxy_gadget_ep_enable(struct vdp_usb_gadget_ep* ep, int value)
 {
+    printf("ep enable\n");
 }
 
 static void proxy_gadget_ep_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
 {
+    printf("ep enqueue\n");
     request->status = vdp_usb_urb_status_completed;
     request->complete(request);
     request->destroy(request);
@@ -59,6 +63,7 @@ static void proxy_gadget_ep_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb
 
 static void proxy_gadget_ep_dequeue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
 {
+    printf("ep dequeue\n");
     request->status = vdp_usb_urb_status_unlinked;
     request->complete(request);
     request->destroy(request);
@@ -66,43 +71,53 @@ static void proxy_gadget_ep_dequeue(struct vdp_usb_gadget_ep* ep, struct vdp_usb
 
 static vdp_usb_urb_status proxy_gadget_ep_clear_stall(struct vdp_usb_gadget_ep* ep)
 {
+    printf("ep clear stall\n");
     return vdp_usb_urb_status_completed;
 }
 
 static void proxy_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep)
 {
+    printf("ep destroy\n");
 }
 
 static void proxy_gadget_interface_enable(struct vdp_usb_gadget_interface* interface, int value)
 {
+    printf("interface enable\n");
 }
 
 static void proxy_gadget_interface_destroy(struct vdp_usb_gadget_interface* interface)
 {
+    printf("interface destroy\n");
 }
 
 static void proxy_gadget_config_enable(struct vdp_usb_gadget_config* config, int value)
 {
+    printf("config enable\n");
 }
 
 static void proxy_gadget_config_destroy(struct vdp_usb_gadget_config* config)
 {
+    printf("config destroy\n");
 }
 
 static void proxy_gadget_reset(struct vdp_usb_gadget* gadget, int start)
 {
+    printf("gadget reset\n");
 }
 
 static void proxy_gadget_power(struct vdp_usb_gadget* gadget, int on)
 {
+    printf("gadget power\n");
 }
 
 static void proxy_gadget_set_address(struct vdp_usb_gadget* gadget, vdp_u32 address)
 {
+    printf("gadget set_address\n");
 }
 
 static void proxy_gadget_destroy(struct vdp_usb_gadget* gadget)
 {
+    printf("gadget destroy\n");
 }
 
 static struct vdp_usb_gadget_ep* create_proxy_gadget_ep(const struct libusb_endpoint_descriptor* desc,
@@ -415,6 +430,10 @@ static int hotplug_callback_attach(libusb_context* ctx, libusb_device* dev, libu
     int i;
     vdp_usb_result vdp_res;
 
+    if (libusb_get_bus_number(dev) == vdp_busnum) {
+        return 0;
+    }
+
     printf("device attached: %d:%d\n",
         libusb_get_bus_number(dev), libusb_get_port_number(dev));
 
@@ -452,6 +471,10 @@ static int hotplug_callback_attach(libusb_context* ctx, libusb_device* dev, libu
 static int hotplug_callback_detach(libusb_context* ctx, libusb_device* dev, libusb_hotplug_event event, void* user_data)
 {
     int i;
+
+    if (libusb_get_bus_number(dev) == vdp_busnum) {
+        return 0;
+    }
 
     printf("device detached: %d:%d\n",
         libusb_get_bus_number(dev), libusb_get_port_number(dev));
@@ -519,6 +542,7 @@ int main(int argc, char* argv[])
             res = 1;
             goto out3;
         }
+        vdp_busnum = vdp_usb_device_get_busnum(vdp_devs[i]);
     }
 
     if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
@@ -561,11 +585,125 @@ int main(int argc, char* argv[])
         libusb_free_device_list(devs, 1);
     }
 
-    while (1) {
-        res = libusb_handle_events(NULL);
-        if (res != 0) {
-            printf("libusb_handle_events() failed: %s\n", libusb_error_name(res));
+    while (!done) {
+        fd_set read_fds, write_fds;
+        const struct libusb_pollfd** libusb_fds;
+        struct timeval tv, zero_tv;
+        int have_tv, i, max_fd = 0;
+        int have_libusb_events = 0;
+
+        zero_tv.tv_sec = 0;
+        zero_tv.tv_usec = 0;
+
+        FD_ZERO(&read_fds);
+        FD_ZERO(&write_fds);
+
+        libusb_fds = libusb_get_pollfds(NULL);
+        if (!libusb_fds) {
+            printf("libusb_get_pollfds() failed\n");
             break;
+        }
+
+        have_tv = libusb_get_next_timeout(NULL, &tv);
+        if (have_tv < 0) {
+            printf("libusb_get_next_timeout() failed\n");
+            libusb_free_pollfds(libusb_fds);
+            break;
+        }
+
+        for (i = 0; i < sizeof(proxy_devs)/sizeof(proxy_devs[0]); ++i) {
+            vdp_fd fd = -1;
+
+            if (!proxy_devs[i]) {
+                continue;
+            }
+
+            vdp_usb_device_wait_event(vdp_devs[i], &fd);
+
+            FD_SET(fd, &read_fds);
+            if (fd > max_fd) {
+                max_fd = fd;
+            }
+        }
+
+        for (i = 0; libusb_fds[i]; ++i) {
+            if (libusb_fds[i]->events & POLLIN) {
+                FD_SET(libusb_fds[i]->fd, &read_fds);
+                if (libusb_fds[i]->fd > max_fd) {
+                    max_fd = libusb_fds[i]->fd;
+                }
+            } else if (libusb_fds[i]->events & POLLOUT) {
+                FD_SET(libusb_fds[i]->fd, &write_fds);
+                if (libusb_fds[i]->fd > max_fd) {
+                    max_fd = libusb_fds[i]->fd;
+                }
+            }
+        }
+
+        assert(max_fd > 0);
+
+        res = select(max_fd + 1, &read_fds, &write_fds, NULL, (have_tv ? &tv : NULL));
+
+        if (res < 0) {
+            printf("select error: %s\n", strerror(errno));
+            libusb_free_pollfds(libusb_fds);
+            break;
+        }
+
+        if (res == 0) {
+            have_libusb_events = 1;
+        } else {
+            for (i = 0; libusb_fds[i]; ++i) {
+                if (libusb_fds[i]->events & POLLIN) {
+                    if (FD_ISSET(libusb_fds[i]->fd, &read_fds)) {
+                        have_libusb_events = 1;
+                        break;
+                    }
+                } else if (libusb_fds[i]->events & POLLOUT) {
+                    if (FD_ISSET(libusb_fds[i]->fd, &write_fds)) {
+                        have_libusb_events = 1;
+                        break;
+                    }
+                }
+            }
+        }
+
+        libusb_free_pollfds(libusb_fds);
+
+        for (i = 0; i < sizeof(proxy_devs)/sizeof(proxy_devs[0]); ++i) {
+            vdp_fd fd = -1;
+
+            if (!proxy_devs[i]) {
+                continue;
+            }
+
+            vdp_usb_device_wait_event(vdp_devs[i], &fd);
+
+            if (FD_ISSET(fd, &read_fds)) {
+                struct vdp_usb_event event;
+
+                vdp_res = vdp_usb_device_get_event(vdp_devs[i], &event);
+
+                if (vdp_res != vdp_usb_success) {
+                    printf("failed to get event: %s\n", vdp_usb_result_to_str(vdp_res));
+                    i = 0;
+                    break;
+                }
+
+                vdp_usb_gadget_event(proxy_devs[i]->gadget, &event);
+            }
+        }
+
+        if (i == 0) {
+            break;
+        }
+
+        if (have_libusb_events) {
+            res = libusb_handle_events_timeout_completed(NULL, &zero_tv, NULL);
+            if (res != 0) {
+                printf("libusb_handle_events_timeout_completed() failed: %s\n", libusb_error_name(res));
+                break;
+            }
         }
     }
 

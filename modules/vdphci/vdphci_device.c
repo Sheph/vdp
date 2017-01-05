@@ -873,6 +873,51 @@ static unsigned int vdphci_device_poll(struct file* file, struct poll_table_stru
     return ret;
 }
 
+static long vdphci_device_ioctl(struct file* file, unsigned int cmd, unsigned long arg)
+{
+    struct vdphci_device* device = file->private_data;
+    int ret = 0;
+    union
+    {
+        struct vdphci_info info;
+    } value;
+
+    if (_IOC_TYPE(cmd) != VDPHCI_IOC_MAGIC) {
+        return -ENOTTY;
+    }
+
+    if (_IOC_DIR(cmd) & _IOC_READ) {
+        ret = !access_ok(VERIFY_WRITE, (void __user*)arg, _IOC_SIZE(cmd));
+    }
+
+    if (_IOC_DIR(cmd) & _IOC_WRITE) {
+        ret = ret || !access_ok(VERIFY_READ, (void __user*)arg, _IOC_SIZE(cmd));
+    }
+
+    if (ret != 0) {
+        return -EFAULT;
+    }
+
+    ret = 0;
+
+    switch (cmd) {
+    case VDPHCI_IOC_GET_INFO:
+        value.info.busnum = vdphci_hcd_to_usb_hcd(device->parent_hcd)->self.busnum;
+        value.info.portnum = device->port->number;
+        if (copy_to_user((struct vdphci_info __user*)arg,
+            &value.info,
+            sizeof(value.info)) != 0) {
+            ret = -EFAULT;
+        }
+        break;
+    default:
+        ret = -ENOTTY;
+        break;
+    }
+
+    return ret;
+}
+
 static struct file_operations vdphci_device_ops =
 {
     .owner = THIS_MODULE,
@@ -881,7 +926,8 @@ static struct file_operations vdphci_device_ops =
     .release = vdphci_device_release,
     .write = vdphci_device_write,
     .read = vdphci_device_read,
-    .poll = vdphci_device_poll
+    .poll = vdphci_device_poll,
+    .unlocked_ioctl = vdphci_device_ioctl
 };
 
 int vdphci_device_init(struct vdphci_hcd* parent_hcd, struct vdphci_port* port, dev_t devno, struct vdphci_device* device)

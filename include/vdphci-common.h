@@ -27,6 +27,7 @@
 #define _VDPHCI_COMMON_H_
 
 #include <linux/types.h>
+#include <linux/ioctl.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,6 +47,22 @@ extern "C" {
  * This is devfs device file prefix.
  */
 #define VDPHCI_DEVICE_PREFIX "vdphcidev"
+
+/*
+ * Device control codes magic.
+ */
+#define VDPHCI_IOC_MAGIC 'V'
+
+/*
+ * Get info.
+ */
+struct vdphci_info
+{
+    int busnum;
+    int portnum;
+};
+
+#define VDPHCI_IOC_GET_INFO _IOR(VDPHCI_IOC_MAGIC, 0, struct vdphci_info)
 
 /*
  * HEvent related. HEvents are sent by HCD to device.
