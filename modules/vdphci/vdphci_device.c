@@ -701,11 +701,34 @@ static int vdphci_device_process_unlink_urb_hevent(
     struct page** pages,
     size_t count)
 {
+    int retval = 0;
     struct vdphci_hevent_header uheader;
+    struct vdphci_hevent_unlink_urb uevent;
 
     BUG_ON(count < sizeof(uheader));
 
-    return -EINVAL;
+    uheader.type = vdphci_hevent_type_unlink_urb;
+    uheader.length = sizeof(uevent);
+
+    retval = vdphci_direct_write(0, sizeof(uheader), &uheader, buf, pages);
+
+    if (retval != 0) {
+        return retval;
+    }
+
+    if (count < (sizeof(uheader) + sizeof(uevent))) {
+        return sizeof(uheader);
+    }
+
+    uevent.seq_num = event->khevent_urb->seq_num;
+
+    retval = vdphci_direct_write(sizeof(uheader), sizeof(uevent), &uevent, buf, pages);
+
+    if (retval != 0) {
+        return retval;
+    }
+
+    return sizeof(uheader) + sizeof(uevent);
 }
 
 static int vdphci_device_process_no_hevent(

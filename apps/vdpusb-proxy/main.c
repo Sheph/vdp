@@ -336,7 +336,7 @@ static void proxy_gadget_config_enable(struct vdp_usb_gadget_config* config, int
 
             libusb_free_config_descriptor(desc);
         } else {
-            printf("libusb_get_active_config_descriptor(): %s\n", libusb_error_name(res));
+            printf("libusb_get_active_config_descriptor() 1: %s\n", libusb_error_name(res));
         }
 
         res = libusb_set_configuration(handle, config->caps.number);
@@ -362,7 +362,7 @@ static void proxy_gadget_config_enable(struct vdp_usb_gadget_config* config, int
 
                 libusb_free_config_descriptor(desc);
             } else {
-                printf("libusb_get_active_config_descriptor(): %s\n", libusb_error_name(res));
+                printf("libusb_get_active_config_descriptor 2(): %s\n", libusb_error_name(res));
             }
         }
     } else {
@@ -404,7 +404,7 @@ static void proxy_gadget_reset(struct vdp_usb_gadget* gadget, int start)
 
     printf("gadget reset %d\n", start);
 
-    if (start) {
+    if (!start) {
         res = libusb_reset_device(handle);
         if (res != 0) {
             printf("libusb_reset_device(): %s\n", libusb_error_name(res));

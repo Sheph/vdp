@@ -751,22 +751,16 @@ static vdp_usb_urb_status gadget_set_address(void* user_data,
     return vdp_usb_urb_status_completed;
 }
 
-static int gadget_reset_configuration(struct vdp_usb_gadget* gadget, int new_index)
+static void gadget_reset_configuration(struct vdp_usb_gadget* gadget)
 {
     int i;
 
     for (i = 0; gadget->caps.configs[i]; ++i) {
         if (gadget->caps.configs[i]->active) {
-            if (i == new_index) {
-                return 0;
-            }
-
             vdp_usb_gadget_config_activate(gadget->caps.configs[i], 0);
             break;
         }
     }
-
-    return 1;
 }
 
 static vdp_usb_urb_status gadget_set_configuration(void* user_data,
@@ -779,9 +773,7 @@ static vdp_usb_urb_status gadget_set_configuration(void* user_data,
         struct vdp_usb_gadget_configi* configi = vdp_containerof(gadgeti->gadget.caps.configs[i],
             struct vdp_usb_gadget_configi, config);
         if (configi->descriptor.bConfigurationValue == configuration) {
-            if (!gadget_reset_configuration(&gadgeti->gadget, i)) {
-                return vdp_usb_urb_status_completed;
-            }
+            gadget_reset_configuration(&gadgeti->gadget);
 
             vdp_usb_gadget_config_activate(&configi->config, 1);
 
@@ -946,7 +938,7 @@ void vdp_usb_gadget_event(struct vdp_usb_gadget* gadget, struct vdp_usb_event* e
         switch (event->data.signal.type) {
         case vdp_usb_signal_reset_start:
             gadgeti->ops.reset(gadget, 1);
-            gadget_reset_configuration(gadget, -1);
+            gadget_reset_configuration(gadget);
             vdp_usb_gadget_ep_activate(&gadgeti->endpoint0i->ep, 0);
             gadgeti->gadget.address = 0;
             break;
@@ -959,7 +951,7 @@ void vdp_usb_gadget_event(struct vdp_usb_gadget* gadget, struct vdp_usb_event* e
             break;
         case vdp_usb_signal_power_off:
             gadgeti->ops.power(gadget, 0);
-            gadget_reset_configuration(gadget, -1);
+            gadget_reset_configuration(gadget);
             vdp_usb_gadget_ep_activate(&gadgeti->endpoint0i->ep, 0);
             gadgeti->gadget.address = 0;
             break;
