@@ -48,6 +48,39 @@ struct proxy_device
     struct vdp_usb_gadget* gadget;
 };
 
+static struct vdp_usb_descriptor_header** extra_to_descriptors(const unsigned char* extra,
+    int extra_length)
+{
+    const struct vdp_usb_descriptor_header* h = (const void*)extra;
+    int cnt = 0, i;
+    struct vdp_usb_descriptor_header** headers;
+
+    while (extra_length >= sizeof(*h)) {
+        extra_length -= (int)h->bLength;
+        ++cnt;
+        h = (const void*)h + (int)h->bLength;
+    }
+
+    if ((extra_length != 0) || (cnt == 0)) {
+        return NULL;
+    }
+
+    headers = malloc(sizeof(*headers) * (cnt + 1));
+
+    if (!headers) {
+        return NULL;
+    }
+
+    for (i = 0; i < cnt; ++i) {
+        headers[i] = (void*)extra;
+        extra += headers[i]->bLength;
+    }
+
+    headers[i] = NULL;
+
+    return headers;
+}
+
 static vdp_usb_urb_status translate_transfer_status(enum libusb_transfer_status status)
 {
     switch (status) {
@@ -439,8 +472,8 @@ static struct vdp_usb_gadget_ep* create_proxy_gadget_ep(libusb_device_handle* ha
         .clear_stall = proxy_gadget_ep_clear_stall,
         .destroy = proxy_gadget_ep_destroy
     };
-
     struct vdp_usb_gadget_ep_caps caps;
+    struct vdp_usb_gadget_ep* ep;
 
     memset(&caps, 0, sizeof(caps));
 
@@ -449,8 +482,13 @@ static struct vdp_usb_gadget_ep* create_proxy_gadget_ep(libusb_device_handle* ha
     caps.type = desc->bmAttributes;
     caps.max_packet_size = desc->wMaxPacketSize;
     caps.interval = desc->bInterval;
+    caps.descriptors = extra_to_descriptors(desc->extra, desc->extra_length);
 
-    return vdp_usb_gadget_ep_create(&caps, &ops, handle);
+    ep = vdp_usb_gadget_ep_create(&caps, &ops, handle);
+
+    free(caps.descriptors);
+
+    return ep;
 }
 
 static struct vdp_usb_gadget_interface* create_proxy_gadget_interface(libusb_device_handle* handle,
@@ -473,11 +511,11 @@ static struct vdp_usb_gadget_interface* create_proxy_gadget_interface(libusb_dev
     caps.subklass = desc->bInterfaceSubClass;
     caps.protocol = desc->bInterfaceProtocol;
     caps.description = desc->iInterface;
-    caps.descriptors = NULL;
+    caps.descriptors = extra_to_descriptors(desc->extra, desc->extra_length);
     caps.endpoints = malloc(sizeof(*caps.endpoints) * ((int)desc->bNumEndpoints + 1));
 
     if (!caps.endpoints) {
-        return NULL;
+        goto out1;
     }
 
     for (i = 0; i < desc->bNumEndpoints; ++i) {
@@ -507,7 +545,7 @@ static struct vdp_usb_gadget_interface* create_proxy_gadget_interface(libusb_dev
 
         caps.endpoints[num_endpoints] = create_proxy_gadget_ep(handle, &desc->endpoint[i], dir);
         if (!caps.endpoints[num_endpoints]) {
-            goto out2;
+            goto out3;
         }
 
         ++num_endpoints;
@@ -518,15 +556,17 @@ static struct vdp_usb_gadget_interface* create_proxy_gadget_interface(libusb_dev
     interface = vdp_usb_gadget_interface_create(&caps, &ops, handle);
 
     if (interface) {
-        goto out1;
+        goto out2;
     }
 
-out2:
+out3:
     for (i = 0; i < num_endpoints; ++i) {
         vdp_usb_gadget_ep_destroy(caps.endpoints[i]);
     }
-out1:
+out2:
     free(caps.endpoints);
+out1:
+    free(caps.descriptors);
 
     return interface;
 }
@@ -554,10 +594,11 @@ static struct vdp_usb_gadget_config* create_proxy_gadget_config(libusb_device_ha
     caps.attributes = desc->bmAttributes;
     caps.max_power = desc->MaxPower;
     caps.description = desc->iConfiguration;
+    caps.descriptors = extra_to_descriptors(desc->extra, desc->extra_length);
     caps.interfaces = malloc(sizeof(*caps.interfaces) * (num_interfaces + 1));
 
     if (!caps.interfaces) {
-        return NULL;
+        goto out1;
     }
 
     num_interfaces = 0;
@@ -566,7 +607,7 @@ static struct vdp_usb_gadget_config* create_proxy_gadget_config(libusb_device_ha
         for (j = 0; j < desc->interface[i].num_altsetting; ++j) {
             caps.interfaces[num_interfaces] = create_proxy_gadget_interface(handle, &desc->interface[i].altsetting[j]);
             if (!caps.interfaces[num_interfaces]) {
-                goto out2;
+                goto out3;
             }
             ++num_interfaces;
         }
@@ -577,15 +618,17 @@ static struct vdp_usb_gadget_config* create_proxy_gadget_config(libusb_device_ha
     config = vdp_usb_gadget_config_create(&caps, &ops, handle);
 
     if (config) {
-        goto out1;
+        goto out2;
     }
 
-out2:
+out3:
     for (j = 0; j < num_interfaces; ++j) {
         vdp_usb_gadget_interface_destroy(caps.interfaces[j]);
     }
-out1:
+out2:
     free(caps.interfaces);
+out1:
+    free(caps.descriptors);
 
     return config;
 }

@@ -241,6 +241,7 @@ struct vdp_usb_gadget_ep* vdp_usb_gadget_ep_create(const struct vdp_usb_gadget_e
     const struct vdp_usb_gadget_ep_ops* ops, void* priv)
 {
     struct vdp_usb_gadget_epi* epi;
+    int i;
 
     assert(caps);
     assert(ops);
@@ -254,6 +255,30 @@ struct vdp_usb_gadget_ep* vdp_usb_gadget_ep_create(const struct vdp_usb_gadget_e
     memset(epi, 0, sizeof(*epi));
 
     memcpy(&epi->ep.caps, caps, sizeof(*caps));
+
+    epi->ep.caps.descriptors =
+        malloc(sizeof(caps->descriptors[0]) * (ptr_array_count((void**)caps->descriptors) + 1));
+
+    if (epi->ep.caps.descriptors == NULL) {
+        goto fail1;
+    }
+
+    for (i = 0; caps->descriptors && caps->descriptors[i]; ++i) {
+        epi->ep.caps.descriptors[i] = malloc(caps->descriptors[i]->bLength);
+
+        if (epi->ep.caps.descriptors[i] == NULL) {
+            for (--i; i >= 0; --i) {
+                free(epi->ep.caps.descriptors[i]);
+            }
+            goto fail2;
+        }
+
+        memcpy(epi->ep.caps.descriptors[i],
+            caps->descriptors[i], caps->descriptors[i]->bLength);
+    }
+
+    epi->ep.caps.descriptors[i] = NULL;
+
     epi->ep.priv = priv;
     epi->ep.active = 0;
     epi->ep.stalled = 0;
@@ -280,12 +305,20 @@ struct vdp_usb_gadget_ep* vdp_usb_gadget_ep_create(const struct vdp_usb_gadget_e
     }
 
     return &epi->ep;
+
+fail2:
+    free(epi->ep.caps.descriptors);
+fail1:
+    free(epi);
+
+    return NULL;
 }
 
 void vdp_usb_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep)
 {
     struct vdp_usb_gadget_epi* epi;
     struct vdp_usb_gadget_request *request, *next;
+    int i;
 
     if (!ep) {
         return;
@@ -303,6 +336,12 @@ void vdp_usb_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep)
     }
 
     assert(vdp_list_empty(&epi->ep.requests));
+
+    for (i = 0; ep->caps.descriptors[i]; ++i) {
+        free(ep->caps.descriptors[i]);
+    }
+
+    free(ep->caps.descriptors);
 
     free(epi);
 }
@@ -559,11 +598,34 @@ struct vdp_usb_gadget_config* vdp_usb_gadget_config_create(const struct vdp_usb_
 
     memcpy(&configi->config.caps, caps, sizeof(*caps));
 
+    configi->config.caps.descriptors =
+        malloc(sizeof(caps->descriptors[0]) * (ptr_array_count((void**)caps->descriptors) + 1));
+
+    if (configi->config.caps.descriptors == NULL) {
+        goto fail2;
+    }
+
+    for (i = 0; caps->descriptors && caps->descriptors[i]; ++i) {
+        configi->config.caps.descriptors[i] = malloc(caps->descriptors[i]->bLength);
+
+        if (configi->config.caps.descriptors[i] == NULL) {
+            for (--i; i >= 0; --i) {
+                free(configi->config.caps.descriptors[i]);
+            }
+            goto fail3;
+        }
+
+        memcpy(configi->config.caps.descriptors[i],
+            caps->descriptors[i], caps->descriptors[i]->bLength);
+    }
+
+    configi->config.caps.descriptors[i] = NULL;
+
     configi->config.caps.interfaces =
         malloc(sizeof(caps->interfaces[0]) * (ptr_array_count((void**)caps->interfaces) + 1));
 
     if (configi->config.caps.interfaces == NULL) {
-        goto fail2;
+        goto fail4;
     }
 
     configi->config.caps.interfaces[ptr_array_count((void**)caps->interfaces)] = NULL;
@@ -585,15 +647,17 @@ struct vdp_usb_gadget_config* vdp_usb_gadget_config_create(const struct vdp_usb_
     configi->descriptor.bmAttributes = caps->attributes;
     configi->descriptor.bMaxPower = caps->max_power;
 
+    cnt = ptr_array_count((void**)configi->config.caps.descriptors);
+
     for (i = 0; configi->config.caps.interfaces[i]; ++i) {
         struct vdp_usb_gadget_interface* interface = configi->config.caps.interfaces[i];
         cnt += 1 + ptr_array_count((void**)interface->caps.descriptors);
         for (j = 0; interface->caps.endpoints[j]; ++j) {
             struct vdp_usb_gadget_ep* ep = interface->caps.endpoints[j];
-            ++cnt;
+            cnt += 1 + ptr_array_count((void**)ep->caps.descriptors);
             if ((ep->caps.type != vdp_usb_gadget_ep_control) &&
                 (ep->caps.dir == vdp_usb_gadget_ep_inout)) {
-                ++cnt;
+                cnt += 1 + ptr_array_count((void**)ep->caps.descriptors);
             }
         }
         if (interface->caps.alt_setting == 0) {
@@ -604,10 +668,16 @@ struct vdp_usb_gadget_config* vdp_usb_gadget_config_create(const struct vdp_usb_
     configi->other = malloc(sizeof(configi->other[0]) * (cnt + 1));
 
     if (configi->other == NULL) {
-        goto fail3;
+        goto fail5;
     }
 
     cnt = 0;
+
+    memcpy(&configi->other[cnt],
+        configi->config.caps.descriptors,
+        ptr_array_count((void**)configi->config.caps.descriptors) * sizeof(configi->other[0]));
+
+    cnt = ptr_array_count((void**)configi->config.caps.descriptors);
 
     for (i = 0; configi->config.caps.interfaces[i]; ++i) {
         struct vdp_usb_gadget_interface* interface = configi->config.caps.interfaces[i];
@@ -627,12 +697,24 @@ struct vdp_usb_gadget_config* vdp_usb_gadget_config_create(const struct vdp_usb_
 
             if (ep->caps.type == vdp_usb_gadget_ep_control) {
                 configi->other[cnt++] = (struct vdp_usb_descriptor_header*)&epi->descriptor_out;
+                memcpy(&configi->other[cnt],
+                    ep->caps.descriptors,
+                    ptr_array_count((void**)ep->caps.descriptors) * sizeof(configi->other[0]));
+                cnt += ptr_array_count((void**)ep->caps.descriptors);
             } else {
                 if ((ep->caps.dir & vdp_usb_gadget_ep_in) != 0) {
                     configi->other[cnt++] = (struct vdp_usb_descriptor_header*)&epi->descriptor_in;
+                    memcpy(&configi->other[cnt],
+                        ep->caps.descriptors,
+                        ptr_array_count((void**)ep->caps.descriptors) * sizeof(configi->other[0]));
+                    cnt += ptr_array_count((void**)ep->caps.descriptors);
                 }
                 if ((ep->caps.dir & vdp_usb_gadget_ep_out) != 0) {
                     configi->other[cnt++] = (struct vdp_usb_descriptor_header*)&epi->descriptor_out;
+                    memcpy(&configi->other[cnt],
+                        ep->caps.descriptors,
+                        ptr_array_count((void**)ep->caps.descriptors) * sizeof(configi->other[0]));
+                    cnt += ptr_array_count((void**)ep->caps.descriptors);
                 }
             }
         }
@@ -642,8 +724,14 @@ struct vdp_usb_gadget_config* vdp_usb_gadget_config_create(const struct vdp_usb_
 
     return &configi->config;
 
-fail3:
+fail5:
     free(configi->config.caps.interfaces);
+fail4:
+    for (i = 0; configi->config.caps.descriptors[i]; ++i) {
+        free(configi->config.caps.descriptors[i]);
+    }
+fail3:
+    free(configi->config.caps.descriptors);
 fail2:
     free(configi);
 fail1:
@@ -671,6 +759,12 @@ void vdp_usb_gadget_config_destroy(struct vdp_usb_gadget_config* config)
     free(configi->other);
 
     free(config->caps.interfaces);
+
+    for (i = 0; config->caps.descriptors[i]; ++i) {
+        free(config->caps.descriptors[i]);
+    }
+
+    free(config->caps.descriptors);
 
     free(configi);
 }

@@ -400,6 +400,7 @@ static int vdphci_urb_dequeue(struct usb_hcd* uhcd, struct urb* urb, int status)
     int ret = 0;
     struct vdphci_port* port;
     struct list_head giveback_list;
+    struct vdphci_khevent_urb* event = urb->hcpriv;
 
     INIT_LIST_HEAD(&giveback_list);
 
@@ -423,6 +424,11 @@ static int vdphci_urb_dequeue(struct usb_hcd* uhcd, struct urb* urb, int status)
         spin_unlock_irqrestore(&hcd->lock, flags);
 
         return ret;
+    }
+
+    if (event) {
+        dprintk("%s: seq_num = %u, port = %d\n", uhcd->self.bus_name,
+            event->seq_num, (int)port->number);
     }
 
     vdphci_port_urb_dequeue(port, urb, &giveback_list);

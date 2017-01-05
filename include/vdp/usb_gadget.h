@@ -164,6 +164,7 @@ struct vdp_usb_gadget_ep_caps
     vdp_usb_gadget_ep_type type;
     vdp_u32 max_packet_size;
     vdp_u32 interval;
+    struct vdp_usb_descriptor_header** descriptors;
 };
 
 struct vdp_usb_gadget_ep
@@ -257,6 +258,7 @@ struct vdp_usb_gadget_config_caps
     vdp_u32 attributes;
     vdp_u32 max_power;
     int description;
+    struct vdp_usb_descriptor_header** descriptors;
     struct vdp_usb_gadget_interface** interfaces;
 };
 

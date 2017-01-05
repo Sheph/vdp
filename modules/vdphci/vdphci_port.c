@@ -420,7 +420,7 @@ struct vdphci_khevent_urb* vdphci_port_khevent_urb_find(struct vdphci_port* port
     list_for_each_entry(event, &port->urb_list, list) {
         if (event->seq_num == seq_num) {
             return event;
-        } else if (seq_num_after(seq_num, event->seq_num)) {
+        } else if (seq_num_before(seq_num, event->seq_num)) {
             /*
              * All other events are later in time, break.
              */

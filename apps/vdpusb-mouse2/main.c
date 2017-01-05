@@ -275,7 +275,8 @@ static struct vdp_usb_gadget* create_gadget()
         .dir = vdp_usb_gadget_ep_inout,
         .type = vdp_usb_gadget_ep_control,
         .max_packet_size = 64,
-        .interval = 0
+        .interval = 0,
+        .descriptors = NULL
     };
     struct vdp_usb_gadget_ep_ops ep0_ops =
     {
@@ -291,7 +292,8 @@ static struct vdp_usb_gadget* create_gadget()
         .dir = vdp_usb_gadget_ep_in,
         .type = vdp_usb_gadget_ep_int,
         .max_packet_size = 8,
-        .interval = 7
+        .interval = 7,
+        .descriptors = NULL
     };
     struct vdp_usb_gadget_ep_ops ep1_ops =
     {
@@ -336,7 +338,8 @@ static struct vdp_usb_gadget* create_gadget()
         .attributes = vdp_usb_gadget_config_att_one | vdp_usb_gadget_config_att_wakeup,
         .max_power = 49,
         .description = 0,
-        .interfaces = ifaces
+        .interfaces = ifaces,
+        .descriptors = NULL
     };
     struct vdp_usb_gadget_config_ops cfg_ops =
     {
