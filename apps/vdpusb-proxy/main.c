@@ -69,7 +69,7 @@ static void proxy_gadget_transfer_cb(struct libusb_transfer* transfer)
     struct vdp_usb_gadget_request* request = transfer->user_data;
 
     if (!request) {
-        printf("ep %u transfer done %p: %d\n", (vdp_u32)transfer->endpoint,
+        printf("ep 0x%X transfer done %p: %d\n", (vdp_u32)transfer->endpoint,
             transfer, transfer->status);
 
         if (transfer->type == LIBUSB_TRANSFER_TYPE_CONTROL) {
@@ -78,7 +78,7 @@ static void proxy_gadget_transfer_cb(struct libusb_transfer* transfer)
         libusb_free_transfer(transfer);
         return;
     } else {
-        printf("ep %u transfer done %u: %d\n", (vdp_u32)transfer->endpoint,
+        printf("ep 0x%X transfer done %u: %d\n", (vdp_u32)transfer->endpoint,
             request->id, transfer->status);
     }
 
@@ -98,7 +98,8 @@ static void proxy_gadget_transfer_cb(struct libusb_transfer* transfer)
         break;
     case LIBUSB_TRANSFER_TYPE_BULK:
     case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-        assert(0);
+        request->status = translate_transfer_status(transfer->status);
+        request->actual_length = transfer->actual_length;
         break;
     default:
         assert(0);
@@ -173,6 +174,12 @@ static void proxy_gadget_ep_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb
         libusb_fill_control_transfer(transfer, handle, buf,
             proxy_gadget_transfer_cb, request, 0);
 
+        if (request->in) {
+            transfer->endpoint = VDP_USB_ENDPOINT_IN_ADDRESS(ep->caps.address);
+        } else {
+            transfer->endpoint = VDP_USB_ENDPOINT_OUT_ADDRESS(ep->caps.address);
+        }
+
         res = libusb_submit_transfer(transfer);
         if (res != 0) {
             printf("libusb_submit_transfer(): %s\n", libusb_error_name(res));
@@ -193,12 +200,48 @@ static void proxy_gadget_ep_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb
         request->destroy(request);
         return;
     case vdp_usb_gadget_ep_bulk:
-    case vdp_usb_gadget_ep_int:
-        assert(0);
-        request->status = vdp_usb_urb_status_error;
-        request->complete(request);
-        request->destroy(request);
-        return;
+    case vdp_usb_gadget_ep_int: {
+        uint8_t address;
+        transfer = libusb_alloc_transfer(0);
+
+        if (!transfer) {
+            printf("libusb_alloc_transfer() failed\n");
+            request->status = vdp_usb_urb_status_error;
+            request->complete(request);
+            request->destroy(request);
+            return;
+        }
+
+        request->priv = transfer;
+
+        if (request->in) {
+            address = VDP_USB_ENDPOINT_IN_ADDRESS(ep->caps.address);
+        } else {
+            address = VDP_USB_ENDPOINT_OUT_ADDRESS(ep->caps.address);
+        }
+
+        if (ep->caps.type == vdp_usb_gadget_ep_bulk) {
+            libusb_fill_bulk_transfer(transfer, handle, address,
+                request->transfer_buffer, request->transfer_length,
+                proxy_gadget_transfer_cb, request, 0);
+        } else {
+            libusb_fill_interrupt_transfer(transfer, handle, address,
+                request->transfer_buffer, request->transfer_length,
+                proxy_gadget_transfer_cb, request, 0);
+        }
+
+        res = libusb_submit_transfer(transfer);
+        if (res != 0) {
+            printf("libusb_submit_transfer(): %s\n", libusb_error_name(res));
+            libusb_free_transfer(transfer);
+            request->status = vdp_usb_urb_status_error;
+            request->complete(request);
+            request->destroy(request);
+            return;
+        }
+
+        break;
+    }
     default:
         assert(0);
         request->status = vdp_usb_urb_status_error;
