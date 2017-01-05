@@ -188,6 +188,7 @@ static void vdp_usb_gadget_ep_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_u
     requesti->request.interval_us = urb->interval;
     requesti->request.status = urb->status;
     requesti->request.iso_packets = urb->iso_packets;
+    requesti->request.raw_setup_packet = urb->setup_packet;
 
     if (ep->caps.type == vdp_usb_gadget_ep_control) {
         requesti->request.setup_packet.type = VDP_USB_REQUESTTYPE_TYPE(urb->setup_packet->bRequestType);

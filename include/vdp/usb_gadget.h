@@ -88,11 +88,15 @@ struct vdp_usb_gadget_request
 {
     struct vdp_list entry;
 
+    void* priv;
+
     vdp_u32 id;
 
     int in;
 
     vdp_u32 flags;
+
+    const struct vdp_usb_control_setup* raw_setup_packet;
 
     struct vdp_usb_gadget_control_setup setup_packet;
 
