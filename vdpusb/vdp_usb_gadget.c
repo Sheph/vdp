@@ -67,7 +67,6 @@ static vdp_usb_result vdp_usb_gadget_request_complete(struct vdp_usb_gadget_requ
 {
     struct vdp_usb_gadget_requesti* requesti;
     vdp_usb_result res;
-    vdp_u32 i;
 
     assert(request);
 
@@ -78,20 +77,11 @@ static vdp_usb_result vdp_usb_gadget_request_complete(struct vdp_usb_gadget_requ
 
     res = vdp_usb_complete_urb(requesti->urb);
 
-    if (res == vdp_usb_success) {
-        if (request->status == vdp_usb_urb_status_stall) {
-            if (requesti->epi->ep.active) {
-                requesti->epi->ep.stalled = 1;
-            }
-        } else if (requesti->urb->type == vdp_usb_urb_iso) {
-            for (i = 0; i < requesti->urb->number_of_packets; ++i) {
-                if (requesti->urb->iso_packets[i].status == vdp_usb_urb_status_stall) {
-                    if (requesti->epi->ep.active) {
-                        requesti->epi->ep.stalled = 1;
-                    }
-                    break;
-                }
-            }
+    if ((res == vdp_usb_success) &&
+        ((requesti->urb->type == vdp_usb_urb_bulk) || (requesti->urb->type == vdp_usb_urb_int)) &&
+        (request->status == vdp_usb_urb_status_stall)) {
+        if (requesti->epi->ep.active) {
+            requesti->epi->ep.stalled = 1;
         }
     }
 
@@ -810,7 +800,7 @@ static vdp_usb_urb_status gadget_get_config_descriptor(void* user_data,
     struct vdp_usb_gadget_configi* configi;
 
     if (index >= gadgeti->descriptor.bNumConfigurations) {
-        return vdp_usb_urb_status_error;
+        return vdp_usb_urb_status_stall;
     }
 
     configi = vdp_containerof(gadgeti->gadget.caps.configs[index],
@@ -875,7 +865,7 @@ static vdp_usb_urb_status gadget_set_configuration(void* user_data,
         }
     }
 
-    return vdp_usb_urb_status_error;
+    return vdp_usb_urb_status_stall;
 }
 
 static struct vdp_usb_filter_ops gadget_filter_ops =
@@ -1101,9 +1091,6 @@ void vdp_usb_gadget_event(struct vdp_usb_gadget* gadget, struct vdp_usb_event* e
         int j, dequeued = 0;
 
         if (!gadgeti->endpoint0i->ep.active) {
-            event->data.urb->status = vdp_usb_urb_status_error;
-            vdp_usb_complete_urb(event->data.urb);
-            vdp_usb_free_urb(event->data.urb);
             break;
         }
 

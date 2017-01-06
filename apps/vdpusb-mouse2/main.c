@@ -104,12 +104,6 @@ static void ep0_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_requ
 {
     request->status = vdp_usb_urb_status_stall;
 
-    if (ep->stalled) {
-        request->complete(request);
-        request->destroy(request);
-        return;
-    }
-
     if (request->setup_packet.request == VDP_USB_REQUEST_GET_DESCRIPTOR) {
         if ((request->setup_packet.type == vdp_usb_gadget_request_standard) &&
             (request->setup_packet.recipient == vdp_usb_gadget_request_interface) &&
@@ -132,10 +126,6 @@ static void ep0_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_requ
             printf("ep0 set_idle %u\n", request->id);
             request->status = vdp_usb_urb_status_completed;
         }
-    }
-
-    if (request->status == vdp_usb_urb_status_stall) {
-        printf("ep0 %u stalled\n", request->id);
     }
 
     request->complete(request);
