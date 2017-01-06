@@ -395,8 +395,25 @@ static void proxy_gadget_ep_dequeue(struct vdp_usb_gadget_ep* ep, struct vdp_usb
 
 static vdp_usb_urb_status proxy_gadget_ep_clear_stall(struct vdp_usb_gadget_ep* ep)
 {
-    printf("ep clear stall\n");
-    return vdp_usb_urb_status_completed;
+    libusb_device_handle* handle = ep->priv;
+    vdp_u8 address;
+    int res;
+
+    printf("ep %u clear stall\n", ep->caps.address);
+
+    if (((ep->caps.dir & vdp_usb_gadget_ep_in) != 0) && (ep->caps.type != vdp_usb_gadget_ep_control)) {
+        address = VDP_USB_ENDPOINT_IN_ADDRESS(ep->caps.address);
+    } else {
+        address = VDP_USB_ENDPOINT_OUT_ADDRESS(ep->caps.address);
+    }
+
+    res = libusb_clear_halt(handle, address);
+    if (res != 0) {
+        printf("libusb_clear_halt(): %s\n", libusb_error_name(res));
+        return vdp_usb_urb_status_stall;
+    } else {
+        return vdp_usb_urb_status_completed;
+    }
 }
 
 static void proxy_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep)
@@ -404,7 +421,7 @@ static void proxy_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep)
     int res;
     struct vdp_usb_gadget_request* request;
 
-    printf("ep destroy\n");
+    printf("ep %u destroy\n", ep->caps.address);
 
     vdp_list_for_each(struct vdp_usb_gadget_request,
         request, &ep->requests, entry) {
@@ -438,7 +455,8 @@ static void proxy_gadget_interface_enable(struct vdp_usb_gadget_interface* inter
 
 static void proxy_gadget_interface_destroy(struct vdp_usb_gadget_interface* interface)
 {
-    printf("interface destroy\n");
+    printf("interface (%u, %u) destroy\n", interface->caps.number,
+        interface->caps.alt_setting);
 }
 
 static void proxy_gadget_config_enable(struct vdp_usb_gadget_config* config, int value)
@@ -523,7 +541,7 @@ static void proxy_gadget_config_enable(struct vdp_usb_gadget_config* config, int
 
 static void proxy_gadget_config_destroy(struct vdp_usb_gadget_config* config)
 {
-    printf("config destroy\n");
+    printf("config %u destroy\n", config->caps.number);
 }
 
 static void proxy_gadget_reset(struct vdp_usb_gadget* gadget, int start)

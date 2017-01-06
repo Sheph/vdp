@@ -312,6 +312,76 @@ static vdp_usb_urb_status test_set_configuration(void* user_data,
     return vdp_usb_urb_status_completed;
 }
 
+static vdp_usb_urb_status test_get_status(void* user_data,
+    vdp_u8 recipient, vdp_u8 index, vdp_u16* status)
+{
+    int device_num = (vdp_uintptr)user_data;
+
+    printf("get_status on device #%d\n", device_num);
+
+    switch (recipient) {
+    case VDP_USB_REQUESTTYPE_RECIPIENT_DEVICE:
+    case VDP_USB_REQUESTTYPE_RECIPIENT_INTERFACE:
+    case VDP_USB_REQUESTTYPE_RECIPIENT_ENDPOINT:
+        return vdp_usb_urb_status_completed;
+    default:
+        return vdp_usb_urb_status_stall;
+    }
+}
+
+static vdp_usb_urb_status test_enable_feature(void* user_data,
+    vdp_u8 recipient, vdp_u8 index, vdp_u16 feature, int enable)
+{
+    int device_num = (vdp_uintptr)user_data;
+
+    printf("enable_feature on device #%d\n", device_num);
+
+    switch (recipient) {
+    case VDP_USB_REQUESTTYPE_RECIPIENT_DEVICE:
+    case VDP_USB_REQUESTTYPE_RECIPIENT_INTERFACE:
+        return vdp_usb_urb_status_stall;
+    case VDP_USB_REQUESTTYPE_RECIPIENT_ENDPOINT:
+        if ((feature != 0) || enable) {
+            return vdp_usb_urb_status_stall;
+        }
+        return vdp_usb_urb_status_completed;
+    default:
+        return vdp_usb_urb_status_stall;
+    }
+}
+
+static vdp_usb_urb_status test_get_interface(void* user_data,
+    vdp_u8 interface, vdp_u8* alt_setting)
+{
+    int device_num = (vdp_uintptr)user_data;
+
+    printf("get_interface on device #%d\n", device_num);
+
+    *alt_setting = 0;
+    return vdp_usb_urb_status_completed;
+}
+
+static vdp_usb_urb_status test_set_interface(void* user_data,
+    vdp_u8 interface, vdp_u8 alt_setting)
+{
+    int device_num = (vdp_uintptr)user_data;
+
+    printf("set_interface on device #%d\n", device_num);
+
+    return vdp_usb_urb_status_completed;
+}
+
+static vdp_usb_urb_status test_set_descriptor(void* user_data,
+    vdp_u16 value, vdp_u16 index, const vdp_byte* data,
+    vdp_u32 len)
+{
+    int device_num = (vdp_uintptr)user_data;
+
+    printf("set_descriptor on device #%d\n", device_num);
+
+    return vdp_usb_urb_status_stall;
+}
+
 static struct vdp_usb_filter_ops test_filter_ops =
 {
     .get_device_descriptor = test_get_device_descriptor,
@@ -319,7 +389,12 @@ static struct vdp_usb_filter_ops test_filter_ops =
     .get_config_descriptor = test_get_config_descriptor,
     .get_string_descriptor = test_get_string_descriptor,
     .set_address = test_set_address,
-    .set_configuration = test_set_configuration
+    .set_configuration = test_set_configuration,
+    .get_status = test_get_status,
+    .enable_feature = test_enable_feature,
+    .get_interface = test_get_interface,
+    .set_interface = test_set_interface,
+    .set_descriptor = test_set_descriptor
 };
 
 static int run(int device_num)

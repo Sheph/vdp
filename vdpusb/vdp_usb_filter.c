@@ -137,6 +137,87 @@ int vdp_usb_filter(struct vdp_usb_urb* urb, struct vdp_usb_filter_ops* ops,
         urb->status = ops->set_configuration(user_data, vdp_u16le_to_cpu(urb->setup_packet->wValue) & 0xFF);
         return 1;
     }
+    case VDP_USB_REQUEST_GET_STATUS: {
+        vdp_u16 status = 0;
+
+        if (!VDP_USB_URB_ENDPOINT_IN(urb->endpoint_address) ||
+            !VDP_USB_REQUESTTYPE_IN(urb->setup_packet->bRequestType) ||
+            (urb->setup_packet->wValue != 0) ||
+            (urb->transfer_length != 2)) {
+            break;
+        }
+        urb->status = ops->get_status(user_data,
+            VDP_USB_REQUESTTYPE_RECIPIENT(urb->setup_packet->bRequestType),
+            vdp_u16le_to_cpu(urb->setup_packet->wIndex),
+            &status);
+        if (urb->status == vdp_usb_urb_status_completed) {
+            urb->transfer_buffer[0] = status & 0xFF;
+            urb->transfer_buffer[1] = (status >> 8) & 0xFF;
+            urb->actual_length = 2;
+        }
+        return 1;
+    }
+    case VDP_USB_REQUEST_CLEAR_FEATURE: {
+        if (!VDP_USB_URB_ENDPOINT_OUT(urb->endpoint_address) ||
+            !VDP_USB_REQUESTTYPE_OUT(urb->setup_packet->bRequestType) ||
+            (urb->transfer_length != 0)) {
+            break;
+        }
+        urb->status = ops->enable_feature(user_data,
+            VDP_USB_REQUESTTYPE_RECIPIENT(urb->setup_packet->bRequestType),
+            vdp_u16le_to_cpu(urb->setup_packet->wIndex),
+            vdp_u16le_to_cpu(urb->setup_packet->wValue), 0);
+        return 1;
+    }
+    case VDP_USB_REQUEST_SET_FEATURE: {
+        if (!VDP_USB_URB_ENDPOINT_OUT(urb->endpoint_address) ||
+            !VDP_USB_REQUESTTYPE_OUT(urb->setup_packet->bRequestType) ||
+            (urb->transfer_length != 0)) {
+            break;
+        }
+        urb->status = ops->enable_feature(user_data,
+            VDP_USB_REQUESTTYPE_RECIPIENT(urb->setup_packet->bRequestType),
+            vdp_u16le_to_cpu(urb->setup_packet->wIndex),
+            vdp_u16le_to_cpu(urb->setup_packet->wValue), 1);
+        return 1;
+    }
+    case VDP_USB_REQUEST_GET_INTERFACE: {
+        if (!VDP_USB_URB_ENDPOINT_IN(urb->endpoint_address) ||
+            (VDP_USB_REQUESTTYPE_RECIPIENT(urb->setup_packet->bRequestType) != VDP_USB_REQUESTTYPE_RECIPIENT_INTERFACE) ||
+            !VDP_USB_REQUESTTYPE_IN(urb->setup_packet->bRequestType) ||
+            (urb->setup_packet->wValue != 0) ||
+            (urb->transfer_length != 1)) {
+            break;
+        }
+        urb->status = ops->get_interface(user_data, vdp_u16le_to_cpu(urb->setup_packet->wIndex), &urb->transfer_buffer[0]);
+        if (urb->status == vdp_usb_urb_status_completed) {
+            urb->actual_length = 1;
+        }
+        return 1;
+    }
+    case VDP_USB_REQUEST_SET_INTERFACE: {
+        if (!VDP_USB_URB_ENDPOINT_OUT(urb->endpoint_address) ||
+            (VDP_USB_REQUESTTYPE_RECIPIENT(urb->setup_packet->bRequestType) != VDP_USB_REQUESTTYPE_RECIPIENT_INTERFACE) ||
+            !VDP_USB_REQUESTTYPE_OUT(urb->setup_packet->bRequestType) ||
+            (urb->transfer_length != 0)) {
+            break;
+        }
+        urb->status = ops->set_interface(user_data, vdp_u16le_to_cpu(urb->setup_packet->wIndex), vdp_u16le_to_cpu(urb->setup_packet->wValue));
+        return 1;
+    }
+    case VDP_USB_REQUEST_SET_DESCRIPTOR: {
+        if (!VDP_USB_URB_ENDPOINT_OUT(urb->endpoint_address) ||
+            (VDP_USB_REQUESTTYPE_RECIPIENT(urb->setup_packet->bRequestType) != VDP_USB_REQUESTTYPE_RECIPIENT_DEVICE) ||
+            !VDP_USB_REQUESTTYPE_OUT(urb->setup_packet->bRequestType)) {
+            break;
+        }
+        urb->status = ops->set_descriptor(user_data, vdp_u16le_to_cpu(urb->setup_packet->wValue),
+            vdp_u16le_to_cpu(urb->setup_packet->wIndex), urb->transfer_buffer, urb->transfer_length);
+        if (urb->status == vdp_usb_urb_status_completed) {
+            urb->actual_length = urb->transfer_length;
+        }
+        return 1;
+    }
     default:
         break;
     }

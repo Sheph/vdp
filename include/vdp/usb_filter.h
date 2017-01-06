@@ -53,6 +53,22 @@ struct vdp_usb_filter_ops
 
     vdp_usb_urb_status (*set_configuration)(void* /*user_data*/,
         vdp_u8 /*configuration*/);
+
+    vdp_usb_urb_status (*get_status)(void* /*user_data*/,
+        vdp_u8 /*recipient*/, vdp_u8 /*index*/, vdp_u16* /*status*/);
+
+    vdp_usb_urb_status (*enable_feature)(void* /*user_data*/,
+        vdp_u8 /*recipient*/, vdp_u8 /*index*/, vdp_u16 /*feature*/, int /*enable*/);
+
+    vdp_usb_urb_status (*get_interface)(void* /*user_data*/,
+        vdp_u8 /*interface*/, vdp_u8* /*alt_setting*/);
+
+    vdp_usb_urb_status (*set_interface)(void* /*user_data*/,
+        vdp_u8 /*interface*/, vdp_u8 /*alt_setting*/);
+
+    vdp_usb_urb_status (*set_descriptor)(void* /*user_data*/,
+        vdp_u16 /*value*/, vdp_u16 /*index*/, const vdp_byte* /*data*/,
+        vdp_u32 /*len*/);
 };
 
 /*
