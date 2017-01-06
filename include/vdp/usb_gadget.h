@@ -157,11 +157,28 @@ typedef enum
     vdp_usb_gadget_ep_int = VDP_USB_ENDPOINT_XFER_INT
 } vdp_usb_gadget_ep_type;
 
+typedef enum
+{
+    vdp_usb_gadget_ep_sync_none = VDP_USB_ENDPOINT_SYNC_NONE,
+    vdp_usb_gadget_ep_sync_async = VDP_USB_ENDPOINT_SYNC_ASYNC,
+    vdp_usb_gadget_ep_sync_adaptive = VDP_USB_ENDPOINT_SYNC_ADAPTIVE,
+    vdp_usb_gadget_ep_sync_sync = VDP_USB_ENDPOINT_SYNC_SYNC
+} vdp_usb_gadget_ep_sync;
+
+typedef enum
+{
+    vdp_usb_gadget_ep_usage_data = VDP_USB_ENDPOINT_USAGE_DATA,
+    vdp_usb_gadget_ep_usage_feedback = VDP_USB_ENDPOINT_USAGE_FEEDBACK,
+    vdp_usb_gadget_ep_usage_implicit_fb = VDP_USB_ENDPOINT_USAGE_IMPLICIT_FB
+} vdp_usb_gadget_ep_usage;
+
 struct vdp_usb_gadget_ep_caps
 {
     vdp_u32 address;
     vdp_usb_gadget_ep_dir dir;
     vdp_usb_gadget_ep_type type;
+    vdp_usb_gadget_ep_sync sync;
+    vdp_usb_gadget_ep_usage usage;
     vdp_u32 max_packet_size;
     vdp_u32 interval;
     struct vdp_usb_descriptor_header** descriptors;

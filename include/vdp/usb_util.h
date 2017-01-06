@@ -108,6 +108,10 @@ struct vdp_usb_interface_descriptor
 #define VDP_USB_ENDPOINT_SYNC_ADAPTIVE (2 << 2)
 #define VDP_USB_ENDPOINT_SYNC_SYNC     (3 << 2)
 
+#define VDP_USB_ENDPOINT_USAGE_DATA 0x00
+#define VDP_USB_ENDPOINT_USAGE_FEEDBACK 0x10
+#define VDP_USB_ENDPOINT_USAGE_IMPLICIT_FB 0x20
+
 #define VDP_USB_ENDPOINT_XFER_CONTROL  0
 #define VDP_USB_ENDPOINT_XFER_ISO      1
 #define VDP_USB_ENDPOINT_XFER_BULK     2
@@ -115,6 +119,12 @@ struct vdp_usb_interface_descriptor
 
 #define VDP_USB_ENDPOINT_IN_ADDRESS(number) (((number) & 0x0F) | 0x80)
 #define VDP_USB_ENDPOINT_OUT_ADDRESS(number) (((number) & 0x0F) | 0x00)
+
+#define VDP_USB_ENDPOINT_TYPE(bmAttributes) ((bmAttributes) & 0x03)
+#define VDP_USB_ENDPOINT_SYNC(bmAttributes) ((bmAttributes) & 0x0C)
+#define VDP_USB_ENDPOINT_USAGE(bmAttributes) ((bmAttributes) & 0x30)
+
+#define VDP_USB_ENDPOINT_ATTRIBUTES(xftype, sync, usage) (((xftype) & 0x03) | ((sync) & 0x0C) | ((usage) & 0x30))
 
 struct vdp_usb_endpoint_descriptor
 {

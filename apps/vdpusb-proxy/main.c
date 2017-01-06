@@ -229,9 +229,15 @@ static void proxy_gadget_transfer_cb(struct libusb_transfer* transfer)
         }
         free(transfer->buffer);
         break;
-    case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-        assert(0);
+    case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS: {
+        int i;
+
+        for (i = 0; i < transfer->num_iso_packets; i++) {
+            request->iso_packets[i].status = translate_transfer_status(transfer->iso_packet_desc[i].status);
+            request->iso_packets[i].actual_length = transfer->iso_packet_desc[i].actual_length;
+        }
         break;
+    }
     case LIBUSB_TRANSFER_TYPE_BULK:
     case LIBUSB_TRANSFER_TYPE_INTERRUPT:
         request->status = translate_transfer_status(transfer->status);
@@ -271,7 +277,7 @@ static void proxy_gadget_ep_enable(struct vdp_usb_gadget_ep* ep, int value)
 static void proxy_gadget_ep_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
 {
     libusb_device_handle* handle = ep->priv;
-    int res;
+    int res, i;
     struct libusb_transfer* transfer;
 
     printf("ep (addr=%u, in=%d, type=%d) enqueue %u\n", ep->caps.address, request->in, ep->caps.type, request->id);
@@ -329,12 +335,47 @@ static void proxy_gadget_ep_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb
 
         break;
     }
-    case vdp_usb_gadget_ep_iso:
-        assert(0);
-        request->status = vdp_usb_urb_status_error;
-        request->complete(request);
-        request->destroy(request);
-        return;
+    case vdp_usb_gadget_ep_iso: {
+        uint8_t address;
+        transfer = libusb_alloc_transfer(request->number_of_packets);
+
+        if (!transfer) {
+            printf("libusb_alloc_transfer() failed\n");
+            request->status = vdp_usb_urb_status_error;
+            request->complete(request);
+            request->destroy(request);
+            return;
+        }
+
+        request->priv = transfer;
+
+        if (request->in) {
+            address = VDP_USB_ENDPOINT_IN_ADDRESS(ep->caps.address);
+        } else {
+            address = VDP_USB_ENDPOINT_OUT_ADDRESS(ep->caps.address);
+        }
+
+        libusb_fill_iso_transfer(transfer, handle, address,
+            request->transfer_buffer, request->transfer_length,
+            request->number_of_packets,
+            proxy_gadget_transfer_cb, request, 0);
+
+        for (i = 0; i < transfer->num_iso_packets; i++) {
+            transfer->iso_packet_desc[i].length = request->iso_packets[i].length;
+        }
+
+        res = libusb_submit_transfer(transfer);
+        if (res != 0) {
+            printf("libusb_submit_transfer(): %s\n", libusb_error_name(res));
+            libusb_free_transfer(transfer);
+            request->status = vdp_usb_urb_status_error;
+            request->complete(request);
+            request->destroy(request);
+            return;
+        }
+
+        break;
+    }
     case vdp_usb_gadget_ep_bulk:
     case vdp_usb_gadget_ep_int: {
         uint8_t address;
@@ -600,7 +641,9 @@ static struct vdp_usb_gadget_ep* create_proxy_gadget_ep(libusb_device_handle* ha
 
     caps.address = VDP_USB_URB_ENDPOINT_NUMBER(desc->bEndpointAddress);
     caps.dir = dir;
-    caps.type = desc->bmAttributes;
+    caps.type = VDP_USB_ENDPOINT_TYPE(desc->bmAttributes);
+    caps.sync = VDP_USB_ENDPOINT_SYNC(desc->bmAttributes);
+    caps.usage = VDP_USB_ENDPOINT_USAGE(desc->bmAttributes);
     caps.max_packet_size = desc->wMaxPacketSize;
     caps.interval = desc->bInterval;
     caps.descriptors = extra_to_descriptors(desc->extra, desc->extra_length);
