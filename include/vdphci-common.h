@@ -249,12 +249,20 @@ typedef enum
     vdphci_dsignal_detached = 1
 } vdphci_dsignal;
 
+typedef enum
+{
+    vdphci_speed_low = 0,
+    vdphci_speed_full = 1,
+    vdphci_speed_high = 2
+} vdphci_speed;
+
 /*
  * Specifies either device was attached or detached.
  */
 struct vdphci_devent_signal
 {
     vdphci_dsignal signal;
+    vdphci_speed speed;
 };
 
 /*

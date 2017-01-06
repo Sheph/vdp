@@ -924,6 +924,8 @@ static int hotplug_callback_attach(libusb_context* ctx, libusb_device* dev, libu
                 libusb_devs[i] = NULL;
             }
 
+            sleep(1);
+
             break;
         }
     }
@@ -1153,6 +1155,8 @@ int main(int argc, char* argv[])
 
             for (i = 0; i < sizeof(libusb_devs)/sizeof(libusb_devs[0]); ++i) {
                 if (libusb_devs[i] && !proxy_devs[i]) {
+                    vdp_usb_speed speed;
+
                     proxy_devs[i] = proxy_device_create(libusb_devs[i]);
                     if (!proxy_devs[i]) {
                         libusb_close(libusb_devs[i]);
@@ -1160,7 +1164,22 @@ int main(int argc, char* argv[])
                         continue;
                     }
 
-                    vdp_res = vdp_usb_device_attach(vdp_devs[i]);
+                    switch (libusb_get_device_speed(libusb_get_device(libusb_devs[i]))) {
+                    case LIBUSB_SPEED_LOW:
+                        speed = vdp_usb_speed_low;
+                        break;
+                    case LIBUSB_SPEED_FULL:
+                        speed = vdp_usb_speed_full;
+                        break;
+                    case LIBUSB_SPEED_HIGH:
+                        speed = vdp_usb_speed_high;
+                        break;
+                    default:
+                        speed = vdp_usb_speed_high;
+                        break;
+                    }
+
+                    vdp_res = vdp_usb_device_attach(vdp_devs[i], speed);
                     if (vdp_res != vdp_usb_success) {
                         printf("failed to attach device: %s\n", vdp_usb_result_to_str(vdp_res));
                         proxy_device_destroy(proxy_devs[i]);

@@ -60,7 +60,8 @@ static int vdphci_device_translate_urb_status(vdphci_urb_status status, int* res
 /*
  * 'cdev_mutex' must be held
  */
-static int vdphci_device_attach_nolock(struct vdphci_device* device, int attach)
+static int vdphci_device_attach_nolock(struct vdphci_device* device, int attach,
+    enum usb_device_speed speed)
 {
     unsigned long flags;
     int need_invalidate = 0;
@@ -74,7 +75,7 @@ static int vdphci_device_attach_nolock(struct vdphci_device* device, int attach)
 
     vdphci_hcd_lock(device->parent_hcd, flags);
     if (attach != vdphci_port_is_device_attached(device->port)) {
-        vdphci_port_set_device_attached(device->port, attach);
+        vdphci_port_set_device_attached(device->port, attach, speed);
         vdphci_port_update(device->port, &giveback_list);
         need_invalidate = 1;
     }
@@ -145,7 +146,7 @@ static int vdphci_device_release(struct inode* inode, struct file* file)
 
     mutex_lock(&device->cdev_mutex);
 
-    vdphci_device_attach_nolock(device, 0);
+    vdphci_device_attach_nolock(device, 0, USB_SPEED_UNKNOWN);
 
     dprintk("%s, device %d: file %p closed\n",
         vdphci_hcd_to_usb_hcd(device->parent_hcd)->self.bus_name,
@@ -184,11 +185,27 @@ static int vdphci_device_process_signal_devent(struct vdphci_device* device, con
 
     switch (signal_devent.signal) {
     case vdphci_dsignal_attached: {
-        retval = vdphci_device_attach_nolock(device, 1);
+        enum usb_device_speed speed;
+
+        switch (signal_devent.speed) {
+        case vdphci_speed_low:
+            speed = USB_SPEED_LOW;
+            break;
+        case vdphci_speed_full:
+            speed = USB_SPEED_FULL;
+            break;
+        case vdphci_speed_high:
+            speed = USB_SPEED_HIGH;
+            break;
+        default:
+            return -EINVAL;
+        }
+
+        retval = vdphci_device_attach_nolock(device, 1, speed);
         break;
     }
     case vdphci_dsignal_detached: {
-        retval = vdphci_device_attach_nolock(device, 0);
+        retval = vdphci_device_attach_nolock(device, 0, USB_SPEED_UNKNOWN);
         break;
     }
     default:

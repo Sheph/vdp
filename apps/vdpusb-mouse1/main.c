@@ -427,7 +427,7 @@ static int run(int device_num)
         goto out1;
     }
 
-    vdp_res = vdp_usb_device_attach(device);
+    vdp_res = vdp_usb_device_attach(device, vdp_usb_speed_high);
 
     if (vdp_res != vdp_usb_success) {
         print_error(vdp_res, "cannot attach device #%d", device_num);

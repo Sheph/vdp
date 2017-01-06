@@ -129,6 +129,7 @@ struct vdphci_port
      * Device is attached to this port.
      */
     int device_attached;
+    enum usb_device_speed device_speed;
 
     /*
      * HEvent related.
@@ -243,9 +244,11 @@ static inline unsigned long vdphci_port_get_re_timeout(struct vdphci_port* port)
     return port->re_timeout;
 }
 
-static inline void vdphci_port_set_device_attached(struct vdphci_port* port, int attached)
+static inline void vdphci_port_set_device_attached(struct vdphci_port* port, int attached,
+    enum usb_device_speed speed)
 {
     port->device_attached = !!attached;
+    port->device_speed = speed;
 }
 
 static inline int vdphci_port_is_device_attached(struct vdphci_port* port)

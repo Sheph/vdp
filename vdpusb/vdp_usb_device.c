@@ -166,7 +166,8 @@ void vdp_usb_device_close(struct vdp_usb_device* device)
     free(device);
 }
 
-vdp_usb_result vdp_usb_device_attach(struct vdp_usb_device* device)
+vdp_usb_result vdp_usb_device_attach(struct vdp_usb_device* device,
+    vdp_usb_speed speed)
 {
     char buff[sizeof(struct vdphci_devent_header) + sizeof(struct vdphci_devent_signal)];
     struct vdphci_devent_header header;
@@ -182,6 +183,7 @@ vdp_usb_result vdp_usb_device_attach(struct vdp_usb_device* device)
 
     header.type = vdphci_devent_type_signal;
     event.signal = vdphci_dsignal_attached;
+    event.speed = speed;
 
     memcpy(&buff[0], &header, sizeof(header));
     memcpy(&buff[0] + sizeof(header), &event, sizeof(event));

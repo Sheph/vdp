@@ -470,7 +470,13 @@ void vdphci_port_update(struct vdphci_port* port, struct list_head* giveback_lis
     if ((port->status & USB_PORT_STAT_POWER) == 0) {
         port->status = 0;
     } else if (port->device_attached) {
-        port->status |= USB_PORT_STAT_CONNECTION | USB_PORT_STAT_HIGH_SPEED;
+        port->status |= USB_PORT_STAT_CONNECTION;
+
+        if (port->device_speed == USB_SPEED_HIGH) {
+            port->status |= USB_PORT_STAT_HIGH_SPEED;
+        } else if (port->device_speed == USB_SPEED_LOW) {
+            port->status |= USB_PORT_STAT_LOW_SPEED;
+        }
 
         if ((port->old_status & USB_PORT_STAT_CONNECTION) == 0) {
             port->status |= (USB_PORT_STAT_C_CONNECTION << 16);

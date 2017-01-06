@@ -107,11 +107,19 @@ void vdp_usb_device_close(struct vdp_usb_device* device);
  * @{
  */
 
+typedef enum
+{
+    vdp_usb_speed_low = 0,
+    vdp_usb_speed_full = 1,
+    vdp_usb_speed_high = 2
+} vdp_usb_speed;
+
 /*
  * Inform the system that the device has attached and that it's ready to react upon
  * events.
  */
-vdp_usb_result vdp_usb_device_attach(struct vdp_usb_device* device);
+vdp_usb_result vdp_usb_device_attach(struct vdp_usb_device* device,
+    vdp_usb_speed speed);
 
 /*
  * Inform the system that the device was detached and can't
