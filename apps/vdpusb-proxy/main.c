@@ -131,6 +131,13 @@ struct vdp_usb_string_table* create_string_tables(libusb_device_handle* handle)
 
             res = libusb_get_string_descriptor(handle, j, tables[i].language_id, buf2, sizeof(buf2));
             if (res < 0) {
+                if (res == LIBUSB_ERROR_TIMEOUT) {
+                    /*
+                     * Request timed out, this means all the rest might
+                     * time out too, so let's just move on to the next language.
+                     */
+                    break;
+                }
                 continue;
             }
 
