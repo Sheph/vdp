@@ -294,9 +294,9 @@ struct vdp_usb_gadget_ep* vdp_usb_gadget_ep_create(const struct vdp_usb_gadget_e
         epi->descriptor_out.bDescriptorType = VDP_USB_DT_ENDPOINT;
         epi->descriptor_out.bEndpointAddress = VDP_USB_ENDPOINT_OUT_ADDRESS(caps->address);
         if ((caps->type & vdp_usb_gadget_ep_iso) != 0) {
-            epi->descriptor_in.bmAttributes = VDP_USB_ENDPOINT_ATTRIBUTES(caps->type, caps->sync, caps->usage);
+            epi->descriptor_out.bmAttributes = VDP_USB_ENDPOINT_ATTRIBUTES(caps->type, caps->sync, caps->usage);
         } else {
-            epi->descriptor_in.bmAttributes = caps->type;
+            epi->descriptor_out.bmAttributes = caps->type;
         }
         epi->descriptor_out.wMaxPacketSize = vdp_cpu_to_u16le(caps->max_packet_size);
         epi->descriptor_out.bInterval = caps->interval;
@@ -490,6 +490,13 @@ struct vdp_usb_gadget_interface* vdp_usb_gadget_interface_create(const struct vd
     interfacei->descriptor.bInterfaceSubClass = caps->subklass;
     interfacei->descriptor.bInterfaceProtocol = caps->protocol;
     interfacei->descriptor.iInterface = caps->description;
+
+    for (i = 0; caps->endpoints[i]; ++i) {
+        if ((caps->endpoints[i]->caps.type != vdp_usb_gadget_ep_control) &&
+            (caps->endpoints[i]->caps.dir == vdp_usb_gadget_ep_inout)) {
+            ++interfacei->descriptor.bNumEndpoints;
+        }
+    }
 
     return &interfacei->interface;
 
