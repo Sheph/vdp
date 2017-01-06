@@ -39,6 +39,7 @@ struct proxy_device;
 
 static int done = 0;
 static struct vdp_usb_device* vdp_devs[5];
+static libusb_device_handle* libusb_devs[5];
 static struct proxy_device* proxy_devs[5];
 static int vdp_busnum = -1;
 
@@ -79,6 +80,101 @@ static struct vdp_usb_descriptor_header** extra_to_descriptors(const unsigned ch
     headers[i] = NULL;
 
     return headers;
+}
+
+struct vdp_usb_string_table* create_string_tables(libusb_device_handle* handle)
+{
+    vdp_u8 buf1[255];
+    vdp_u8 buf2[255];
+    int i, j, res, num_langs;
+    struct vdp_usb_string_table* tables;
+
+    res = libusb_get_string_descriptor(handle, 0, 0, buf1, sizeof(buf1));
+    if (res < 0) {
+        printf("libusb_get_string_descriptor(0, 0): %s\n", libusb_error_name(res));
+        return NULL;
+    }
+
+    if (res < 4) {
+        return NULL;
+    }
+
+    if (((res - 2) % 2) != 0) {
+        return NULL;
+    }
+
+    num_langs = (res - 2) / 2;
+
+    tables = malloc(sizeof(*tables) * (num_langs + 1));
+
+    if (!tables) {
+        return NULL;
+    }
+
+    memset(tables, 0, sizeof(*tables) * (num_langs + 1));
+
+    for (i = 0; i < num_langs; ++i) {
+        int idx = 0;
+
+        tables[i].language_id = buf1[(i + 1) * 2] | (buf1[1 + ((i + 1) * 2)] << 8);
+        tables[i].strings = malloc(sizeof(*tables[i].strings) * 256);
+
+        if (!tables[i].strings) {
+            goto fail;
+        }
+
+        memset((void*)tables[i].strings, 0, sizeof(*tables[i].strings) * 256);
+
+        for (j = 1; j <= 255; ++j) {
+            int num_chars;
+            struct vdp_usb_string* string;
+
+            res = libusb_get_string_descriptor(handle, j, tables[i].language_id, buf2, sizeof(buf2));
+            if (res < 0) {
+                continue;
+            }
+
+            if (res < 2) {
+                continue;
+            }
+
+            if (((res - 2) % 2) != 0) {
+                continue;
+            }
+
+            num_chars = (res - 2) / 2;
+
+            string = (struct vdp_usb_string*)&tables[i].strings[idx];
+
+            string->index = j;
+            string->str = malloc(num_chars * 3 + 1);
+
+            if (!string->str) {
+                goto fail;
+            }
+
+            res = vdp_usb_utf16le_to_utf8((const vdp_u16*)&buf2[2], (char*)string->str, num_chars);
+            ((char*)(string->str))[res] = 0;
+
+            printf("string (0x%X, %d) = %s\n", (int)tables[i].language_id, j, string->str);
+
+            ++idx;
+        }
+    }
+
+    return tables;
+
+fail:
+    for (i = 0; tables[i].strings; ++i) {
+        const struct vdp_usb_string* strings = tables[i].strings;
+        for (j = 0; strings[j].str; ++j) {
+            free((void*)strings[j].str);
+        }
+        free((void*)strings);
+    }
+    free(tables);
+
+    return NULL;
 }
 
 static vdp_usb_urb_status translate_transfer_status(enum libusb_transfer_status status)
@@ -647,6 +743,7 @@ static struct vdp_usb_gadget* create_proxy_gadget(libusb_device_handle* handle,
     struct vdp_usb_gadget_caps caps;
     struct libusb_endpoint_descriptor ep0_desc;
     uint8_t i, num_configs = 0;
+    int j, k;
     struct vdp_usb_gadget* gadget = NULL;
 
     memset(&caps, 0, sizeof(caps));
@@ -667,23 +764,23 @@ static struct vdp_usb_gadget* create_proxy_gadget(libusb_device_handle* handle,
     caps.manufacturer = dev_desc->iManufacturer;
     caps.product = dev_desc->iProduct;
     caps.serial_number = dev_desc->iSerialNumber;
-    caps.string_tables = NULL;
+    caps.string_tables = create_string_tables(handle);
     caps.configs = malloc(sizeof(*caps.configs) * ((int)dev_desc->bNumConfigurations + 1));
 
     if (!caps.configs) {
-        return NULL;
+        goto out1;
     }
 
     caps.endpoint0 = create_proxy_gadget_ep(handle, &ep0_desc, vdp_usb_gadget_ep_inout);
 
     if (!caps.endpoint0) {
-        goto out1;
+        goto out2;
     }
 
     for (i = 0; i < dev_desc->bNumConfigurations; ++i) {
         caps.configs[num_configs] = create_proxy_gadget_config(handle, config_descs[i]);
         if (!caps.configs[num_configs]) {
-            goto out2;
+            goto out3;
         }
 
         ++num_configs;
@@ -694,16 +791,25 @@ static struct vdp_usb_gadget* create_proxy_gadget(libusb_device_handle* handle,
     gadget = vdp_usb_gadget_create(&caps, &ops, handle);
 
     if (gadget) {
-        goto out1;
+        goto out2;
     }
 
-out2:
+out3:
     for (i = 0; i < num_configs; ++i) {
         vdp_usb_gadget_config_destroy(caps.configs[i]);
     }
     vdp_usb_gadget_ep_destroy(caps.endpoint0);
-out1:
+out2:
     free(caps.configs);
+out1:
+    for (j = 0; caps.string_tables && caps.string_tables[j].strings; ++j) {
+        const struct vdp_usb_string* strings = caps.string_tables[j].strings;
+        for (k = 0; strings[k].str != NULL; ++k) {
+            free((void*)strings[k].str);
+        }
+        free((void*)strings);
+    }
+    free(caps.string_tables);
 
     return gadget;
 }
@@ -782,7 +888,6 @@ static void proxy_device_destroy(struct proxy_device* proxy)
 static int hotplug_callback_attach(libusb_context* ctx, libusb_device* dev, libusb_hotplug_event event, void* user_data)
 {
     int i;
-    vdp_usb_result vdp_res;
 
     if (libusb_get_bus_number(dev) == vdp_busnum) {
         return 0;
@@ -792,27 +897,13 @@ static int hotplug_callback_attach(libusb_context* ctx, libusb_device* dev, libu
         libusb_get_bus_number(dev), libusb_get_port_number(dev));
 
     for (i = 0; i < sizeof(proxy_devs)/sizeof(proxy_devs[0]); ++i) {
-        if (!proxy_devs[i]) {
-            libusb_device_handle* handle;
+        if (!libusb_devs[i] && !proxy_devs[i]) {
             int res;
 
-            res = libusb_open(dev, &handle);
+            res = libusb_open(dev, &libusb_devs[i]);
             if (res != LIBUSB_SUCCESS) {
                 printf("error opening device\n");
-                break;
-            }
-
-            proxy_devs[i] = proxy_device_create(handle);
-            if (!proxy_devs[i]) {
-                libusb_close(handle);
-                break;
-            }
-
-            vdp_res = vdp_usb_device_attach(vdp_devs[i]);
-            if (vdp_res != vdp_usb_success) {
-                printf("failed to attach device: %s\n", vdp_usb_result_to_str(vdp_res));
-                proxy_device_destroy(proxy_devs[i]);
-                proxy_devs[i] = NULL;
+                libusb_devs[i] = NULL;
             }
 
             break;
@@ -834,13 +925,14 @@ static int hotplug_callback_detach(libusb_context* ctx, libusb_device* dev, libu
         libusb_get_bus_number(dev), libusb_get_port_number(dev));
 
     for (i = 0; i < sizeof(proxy_devs)/sizeof(proxy_devs[0]); ++i) {
-        if (proxy_devs[i]) {
-            libusb_device* other_dev = libusb_get_device(proxy_devs[i]->handle);
+        if (libusb_devs[i]) {
+            libusb_device* other_dev = libusb_get_device(libusb_devs[i]);
             if ((libusb_get_bus_number(dev) == libusb_get_bus_number(other_dev)) &&
                 (libusb_get_port_number(dev) == libusb_get_port_number(other_dev))) {
-                proxy_device_destroy(proxy_devs[i]);
-                proxy_devs[i] = NULL;
-                vdp_usb_device_detach(vdp_devs[i]);
+                if (!proxy_devs[i]) {
+                    libusb_close(libusb_devs[i]);
+                }
+                libusb_devs[i] = NULL;
                 break;
             }
         }
@@ -859,8 +951,6 @@ int main(int argc, char* argv[])
     libusb_hotplug_callback_handle hp[2];
     int product_id, vendor_id;
     int res;
-    libusb_device** devs;
-    ssize_t cnt;
     struct vdp_usb_context* ctx;
     vdp_usb_result vdp_res;
     int i;
@@ -905,7 +995,7 @@ int main(int argc, char* argv[])
         goto out3;
     }
 
-    res = libusb_hotplug_register_callback(NULL, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED, 0, vendor_id,
+    res = libusb_hotplug_register_callback(NULL, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED, LIBUSB_HOTPLUG_ENUMERATE, vendor_id,
         product_id, LIBUSB_HOTPLUG_MATCH_ANY, hotplug_callback_attach, NULL, &hp[0]);
     if (res != LIBUSB_SUCCESS) {
         printf("error registering callback 0\n");
@@ -922,22 +1012,6 @@ int main(int argc, char* argv[])
     }
 
     printf("waiting for %04x:%04x\n", vendor_id, product_id);
-
-    cnt = libusb_get_device_list(NULL, &devs);
-    if (cnt > 0) {
-        libusb_device* dev;
-        i = 0;
-
-        while ((dev = devs[i++]) != NULL) {
-            struct libusb_device_descriptor desc;
-            res = libusb_get_device_descriptor(dev, &desc);
-            if ((res == 0) && (desc.idVendor == vendor_id) && (desc.idProduct == product_id)) {
-                hotplug_callback_attach(NULL, dev, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED, NULL);
-            }
-        }
-
-        libusb_free_device_list(devs, 1);
-    }
 
     while (!done) {
         fd_set read_fds, write_fds;
@@ -1057,6 +1131,29 @@ int main(int argc, char* argv[])
             if (res != 0) {
                 printf("libusb_handle_events_timeout_completed() failed: %s\n", libusb_error_name(res));
                 break;
+            }
+
+            for (i = 0; i < sizeof(libusb_devs)/sizeof(libusb_devs[0]); ++i) {
+                if (libusb_devs[i] && !proxy_devs[i]) {
+                    proxy_devs[i] = proxy_device_create(libusb_devs[i]);
+                    if (!proxy_devs[i]) {
+                        libusb_close(libusb_devs[i]);
+                        libusb_devs[i] = NULL;
+                        continue;
+                    }
+
+                    vdp_res = vdp_usb_device_attach(vdp_devs[i]);
+                    if (vdp_res != vdp_usb_success) {
+                        printf("failed to attach device: %s\n", vdp_usb_result_to_str(vdp_res));
+                        proxy_device_destroy(proxy_devs[i]);
+                        proxy_devs[i] = NULL;
+                        libusb_devs[i] = NULL;
+                    }
+                } else if (!libusb_devs[i] && proxy_devs[i]) {
+                    proxy_device_destroy(proxy_devs[i]);
+                    proxy_devs[i] = NULL;
+                    vdp_usb_device_detach(vdp_devs[i]);
+                }
             }
         }
     }

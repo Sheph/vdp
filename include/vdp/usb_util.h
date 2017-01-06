@@ -173,6 +173,11 @@ struct vdp_usb_string_table
 };
 
 /*
+ * 's' must be at least len * 3 long.
+ */
+int vdp_usb_utf16le_to_utf8(const vdp_u16* pwcs, char* s, unsigned int len);
+
+/*
  * @}
  */
 
