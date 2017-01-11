@@ -343,6 +343,60 @@ static int vdphci_device_write_out_other_urb(const struct vdphci_devent_urb* urb
     return 0;
 }
 
+static int vdphci_device_write_out_iso_urb(const struct vdphci_devent_urb* urb_devent,
+    struct urb* urb,
+    const char __user* buf,
+    struct page** pages,
+    size_t count)
+{
+    int retval = 0;
+    int i;
+    u32 total_length = 0;
+
+    if (count != (urb->number_of_packets * sizeof(struct vdphci_d_iso_packet))) {
+        return -EINVAL;
+    }
+
+    if (urb_devent->actual_length > urb->transfer_buffer_length) {
+        return -EINVAL;
+    }
+
+    urb->error_count = 0;
+
+    for (i = 0; i < urb->number_of_packets; ++i) {
+        struct vdphci_d_iso_packet packet;
+
+        retval = vdphci_direct_read(&packet, sizeof(packet),
+            sizeof(struct vdphci_devent_header) +
+            offsetof(struct vdphci_devent_urb, data.buff) +
+            sizeof(packet) * i,
+            buf, pages);
+
+        if (retval != 0) {
+            return retval;
+        }
+
+        if (!vdphci_device_translate_urb_status(packet.status, &urb->iso_frame_desc[i].status)) {
+            return -EINVAL;
+        }
+        urb->iso_frame_desc[i].actual_length = packet.actual_length;
+        total_length += packet.actual_length;
+
+        if (urb->iso_frame_desc[i].status != 0) {
+            ++urb->error_count;
+        }
+    }
+
+    if (total_length != urb_devent->actual_length) {
+        return -EINVAL;
+    }
+
+    urb->status = 0;
+    urb->actual_length = total_length;
+
+    return 0;
+}
+
 /*
  * @}
  */
@@ -416,6 +470,12 @@ static int vdphci_device_process_urb_devent(struct vdphci_device* device, const 
                 event_data_size);
             break;
         case PIPE_ISOCHRONOUS:
+            retval = vdphci_device_write_out_iso_urb(&urb_devent,
+                urb_khevent->urb,
+                buf,
+                pages,
+                event_data_size);
+            break;
         default:
             print_error("Bad URB pipe type: %d\n", usb_pipetype(urb_khevent->urb->pipe));
             urb_khevent->urb->status = -EPROTO;
@@ -740,6 +800,62 @@ static int vdphci_device_read_out_other_urb(
     return data_size;
 }
 
+static int vdphci_device_read_out_iso_urb(
+    u32 seq_num,
+    struct urb* urb,
+    char __user* buf,
+    struct page** pages,
+    size_t count)
+{
+    int retval = 0;
+    int i;
+    size_t data_size = offsetof(struct vdphci_hevent_urb, data.packets) +
+        (sizeof(struct vdphci_h_iso_packet) * urb->number_of_packets) +
+        urb->transfer_buffer_length;
+
+    if (count < data_size) {
+        return data_size;
+    }
+
+    retval = vdphci_urb_hevent_write_common(seq_num, urb, buf, pages);
+
+    if (retval != 0) {
+        return retval;
+    }
+
+    for (i = 0; i < urb->number_of_packets; ++i) {
+        struct vdphci_h_iso_packet packet;
+
+        packet.length = urb->iso_frame_desc[i].length;
+
+        retval = vdphci_direct_write(sizeof(struct vdphci_hevent_header) +
+            offsetof(struct vdphci_hevent_urb, data.packets) +
+            (sizeof(struct vdphci_h_iso_packet) * i),
+            sizeof(struct vdphci_h_iso_packet),
+            &packet,
+            buf,
+            pages);
+
+        if (retval != 0) {
+            return retval;
+        }
+    }
+
+    retval = vdphci_direct_write(sizeof(struct vdphci_hevent_header) +
+        offsetof(struct vdphci_hevent_urb, data.packets) +
+        (sizeof(struct vdphci_h_iso_packet) * urb->number_of_packets),
+        urb->transfer_buffer_length,
+        urb->transfer_buffer,
+        buf,
+        pages);
+
+    if (retval != 0) {
+        return retval;
+    }
+
+    return data_size;
+}
+
 /*
  * @}
  */
@@ -805,6 +921,12 @@ static int vdphci_device_process_urb_hevent(
                 event_data_size);
             break;
         case PIPE_ISOCHRONOUS:
+            retval = vdphci_device_read_out_iso_urb(event->seq_num,
+                event->urb,
+                buf,
+                pages,
+                event_data_size);
+            break;
         default:
             print_error("Bad URB pipe type: %d\n", usb_pipetype(event->urb->pipe));
             retval = -EIO;

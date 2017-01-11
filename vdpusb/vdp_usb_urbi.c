@@ -371,7 +371,7 @@ static vdp_usb_result urbi_create_out_iso(struct vdp_usb_device* device,
      * Validate the URB.
      */
 
-    if ((urb->number_of_packets * sizeof(struct vdphci_h_iso_packet)) < iso_packets_size) {
+    if ((urb->number_of_packets * sizeof(struct vdphci_h_iso_packet)) > iso_packets_size) {
         VDP_USB_LOG_ERROR(device->context,
             "device %d: bad iso packet data",
             device->device_number);
