@@ -435,6 +435,15 @@ static int vdphci_device_process_urb_devent(struct vdphci_device* device, const 
         goto out;
     }
 
+    if (urb_devent.status == vdphci_urb_status_unprocessed) {
+        urb_khevent->urb->status = -ENOMEM;
+        retval = 0;
+
+        vdphci_port_khevent_urb_remove(device->port, urb_khevent, &giveback_list);
+
+        goto out;
+    }
+
     if (usb_pipein(urb_khevent->urb->pipe)) {
         switch (usb_pipetype(urb_khevent->urb->pipe)) {
         case PIPE_CONTROL:

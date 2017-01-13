@@ -719,6 +719,8 @@ vdp_usb_result vdp_usb_urbi_update(struct vdp_usb_urbi* urbi)
 
             actual_length += urbi->urb.iso_packets[i].actual_length;
         }
+
+        urbi->devent_urb.status = vdphci_urb_status_completed;
     } else {
         actual_length = urbi->urb.actual_length;
 
