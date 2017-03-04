@@ -25,6 +25,7 @@
 
 #include "vdp_py_usb_context.h"
 #include "vdp_py_usb_error.h"
+#include "vdp_py_usb_device.h"
 
 static void vdp_py_usb_context_dealloc(struct vdp_py_usb_context* self)
 {
@@ -59,9 +60,29 @@ static PyObject* vdp_py_usb_context_get_device_range(struct vdp_py_usb_context* 
     return Py_BuildValue("ii", (int)device_lower, (int)device_upper);
 }
 
+static PyObject* vdp_py_usb_context_open_device(struct vdp_py_usb_context* self, PyObject* args)
+{
+    int device_number;
+    struct vdp_usb_device* device;
+
+    if (!PyArg_ParseTuple(args, "i:open_device", &device_number)) {
+        return NULL;
+    }
+
+    vdp_usb_result res = vdp_usb_device_open(self->ctx, device_number, &device);
+
+    if (res != vdp_usb_success) {
+        vdp_py_usb_error_set(res);
+        return NULL;
+    }
+
+    return vdp_py_usb_device_new(device);
+}
+
 static PyMethodDef vdp_py_usb_context_methods[] =
 {
     { "get_device_range", (PyCFunction)vdp_py_usb_context_get_device_range, METH_NOARGS, "Get available device numbers" },
+    { "open_device", (PyCFunction)vdp_py_usb_context_open_device, METH_VARARGS, "Open device" },
     { NULL }
 };
 

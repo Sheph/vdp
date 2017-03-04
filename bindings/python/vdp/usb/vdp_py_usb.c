@@ -26,6 +26,7 @@
 #include "vdp_py_usb_error.h"
 #include "vdp_py_usb_urb.h"
 #include "vdp_py_usb_context.h"
+#include "vdp_py_usb_device.h"
 
 static PyMethodDef vdp_py_usb_methods[] =
 {
@@ -39,15 +40,20 @@ PyMODINIT_FUNC initusb(void)
 {
     PyObject* module = Py_InitModule3("usb", vdp_py_usb_methods, "vdpusb module");
 
-    PyModule_AddIntConstant(module, "VDP_USB_SUCCESS", vdp_usb_success);
-    PyModule_AddIntConstant(module, "VDP_USB_NOMEM", vdp_usb_nomem);
-    PyModule_AddIntConstant(module, "VDP_USB_MISUSE", vdp_usb_misuse);
-    PyModule_AddIntConstant(module, "VDP_USB_UNKNOWN", vdp_usb_unknown);
-    PyModule_AddIntConstant(module, "VDP_USB_NOT_FOUND", vdp_usb_not_found);
-    PyModule_AddIntConstant(module, "VDP_USB_BUSY", vdp_usb_busy);
-    PyModule_AddIntConstant(module, "VDP_USB_PROTOCOL_ERROR", vdp_usb_protocol_error);
+    PyModule_AddIntConstant(module, "SUCCESS", vdp_usb_success);
+    PyModule_AddIntConstant(module, "NOMEM", vdp_usb_nomem);
+    PyModule_AddIntConstant(module, "MISUSE", vdp_usb_misuse);
+    PyModule_AddIntConstant(module, "UNKNOWN", vdp_usb_unknown);
+    PyModule_AddIntConstant(module, "NOT_FOUND", vdp_usb_not_found);
+    PyModule_AddIntConstant(module, "BUSY", vdp_usb_busy);
+    PyModule_AddIntConstant(module, "PROTOCOL_ERROR", vdp_usb_protocol_error);
+
+    PyModule_AddIntConstant(module, "SPEED_LOW", vdp_usb_speed_low);
+    PyModule_AddIntConstant(module, "SPEED_FULL", vdp_usb_speed_full);
+    PyModule_AddIntConstant(module, "SPEED_HIGH", vdp_usb_speed_high);
 
     vdp_py_usb_error_init(module);
     vdp_py_usb_context_init(module);
     vdp_py_usb_urb_init(module);
+    vdp_py_usb_device_init(module);
 }

@@ -114,6 +114,8 @@ typedef enum
     vdp_usb_speed_high = 2
 } vdp_usb_speed;
 
+int vdp_usb_speed_validate(int value);
+
 /*
  * Inform the system that the device has attached and that it's ready to react upon
  * events.

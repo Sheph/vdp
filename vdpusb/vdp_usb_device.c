@@ -166,6 +166,18 @@ void vdp_usb_device_close(struct vdp_usb_device* device)
     free(device);
 }
 
+int vdp_usb_speed_validate(int value)
+{
+    switch (value) {
+    case vdp_usb_speed_low:
+    case vdp_usb_speed_full:
+    case vdp_usb_speed_high:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 vdp_usb_result vdp_usb_device_attach(struct vdp_usb_device* device,
     vdp_usb_speed speed)
 {
