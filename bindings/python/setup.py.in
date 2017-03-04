@@ -4,15 +4,17 @@ vdp_usb = Extension('vdp.usb', sources = ['${CMAKE_CURRENT_SOURCE_DIR}/vdp/usb/v
 '${CMAKE_CURRENT_SOURCE_DIR}/vdp/usb/vdp_py_usb_context.c',
 '${CMAKE_CURRENT_SOURCE_DIR}/vdp/usb/vdp_py_usb_device.c',
 '${CMAKE_CURRENT_SOURCE_DIR}/vdp/usb/vdp_py_usb_event.c',
-'${CMAKE_CURRENT_SOURCE_DIR}/vdp/usb/vdp_py_usb_urb.c'],
+'${CMAKE_CURRENT_SOURCE_DIR}/vdp/usb/vdp_py_usb_urb.c',
+'${CMAKE_CURRENT_SOURCE_DIR}/vdp/usb/vdp_py_usb_error.c'],
 depends = ['${CMAKE_CURRENT_SOURCE_DIR}/vdp/usb/vdp_py_usb_context.h',
 '${CMAKE_CURRENT_SOURCE_DIR}/vdp/usb/vdp_py_usb_device.h',
 '${CMAKE_CURRENT_SOURCE_DIR}/vdp/usb/vdp_py_usb_event.h',
-'${CMAKE_CURRENT_SOURCE_DIR}/vdp/usb/vdp_py_usb_urb.h'],
+'${CMAKE_CURRENT_SOURCE_DIR}/vdp/usb/vdp_py_usb_urb.h',
+'${CMAKE_CURRENT_SOURCE_DIR}/vdp/usb/vdp_py_usb_error.h'],
 include_dirs=['${VDP_INCLUDE_DIR}'],
 extra_compile_args=[${VDP_PY_CFLAGS}],
 library_dirs=['${CMAKE_LIBRARY_OUTPUT_DIRECTORY}'],
-libraries=['vdpusb'])
+libraries=['vdpusb', 'usb-1.0', 'lwl'])
 
 setup(name = 'vdp',
     version = '1.0',

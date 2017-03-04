@@ -23,21 +23,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _VDP_PY_USB_CONTEXT_H_
-#define _VDP_PY_USB_CONTEXT_H_
+#ifndef _VDP_PY_USB_ERROR_H_
+#define _VDP_PY_USB_ERROR_H_
 
 #include <Python.h>
 #include "vdp/usb.h"
 
-struct vdp_py_usb_context
-{
-    PyObject_HEAD
-    struct vdp_usb_context* ctx;
-};
+void vdp_py_usb_error_init(PyObject* module);
 
-void vdp_py_usb_context_init(PyObject* module);
-
-PyObject* vdp_py_usb_context_new(struct vdp_usb_context* ctx);
-struct vdp_py_usb_context* vdp_py_usb_context_check(PyObject* obj);
+void vdp_py_usb_error_set(vdp_usb_result res);
 
 #endif
