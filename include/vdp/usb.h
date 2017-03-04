@@ -157,6 +157,8 @@ typedef enum
     vdp_usb_signal_power_off = 3
 } vdp_usb_signal_type;
 
+int vdp_usb_signal_type_validate(int value);
+
 const char* vdp_usb_signal_type_to_str(vdp_usb_signal_type signal_type);
 
 struct vdp_usb_signal

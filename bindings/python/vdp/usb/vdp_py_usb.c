@@ -27,6 +27,7 @@
 #include "vdp_py_usb_urb.h"
 #include "vdp_py_usb_context.h"
 #include "vdp_py_usb_device.h"
+#include "vdp_py_usb_event.h"
 
 static PyMethodDef vdp_py_usb_methods[] =
 {
@@ -52,8 +53,14 @@ PyMODINIT_FUNC initusb(void)
     PyModule_AddIntConstant(module, "SPEED_FULL", vdp_usb_speed_full);
     PyModule_AddIntConstant(module, "SPEED_HIGH", vdp_usb_speed_high);
 
+    PyModule_AddIntConstant(module, "SIGNAL_RESET_START", vdp_usb_signal_reset_start);
+    PyModule_AddIntConstant(module, "SIGNAL_RESET_END", vdp_usb_signal_reset_end);
+    PyModule_AddIntConstant(module, "SIGNAL_POWER_ON", vdp_usb_signal_power_on);
+    PyModule_AddIntConstant(module, "SIGNAL_POWER_OFF", vdp_usb_signal_power_off);
+
     vdp_py_usb_error_init(module);
     vdp_py_usb_context_init(module);
     vdp_py_usb_urb_init(module);
     vdp_py_usb_device_init(module);
+    vdp_py_usb_event_init(module);
 }

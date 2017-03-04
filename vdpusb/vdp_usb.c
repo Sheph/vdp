@@ -28,6 +28,19 @@
 #include <stdlib.h>
 #include <assert.h>
 
+int vdp_usb_signal_type_validate(int value)
+{
+    switch (value) {
+    case vdp_usb_signal_reset_start:
+    case vdp_usb_signal_reset_end:
+    case vdp_usb_signal_power_on:
+    case vdp_usb_signal_power_off:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 const char* vdp_usb_result_to_str(vdp_usb_result res)
 {
     switch (res) {

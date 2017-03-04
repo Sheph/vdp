@@ -80,11 +80,26 @@ static PyObject* vdp_py_usb_device_close(struct vdp_py_usb_device* self)
     return Py_None;
 }
 
+static PyObject* vdp_py_usb_device_get_fd(struct vdp_py_usb_device* self)
+{
+    vdp_fd fd;
+
+    vdp_usb_result res = vdp_usb_device_wait_event(self->device, &fd);
+
+    if (res != vdp_usb_success) {
+        vdp_py_usb_error_set(res);
+        return NULL;
+    }
+
+    return PyLong_FromLong(fd);
+}
+
 static PyMethodDef vdp_py_usb_device_methods[] =
 {
     { "attach", (PyCFunction)vdp_py_usb_device_attach, METH_VARARGS, "Attach the device to port" },
     { "detach", (PyCFunction)vdp_py_usb_device_detach, METH_NOARGS, "Detach from port" },
     { "close", (PyCFunction)vdp_py_usb_device_close, METH_NOARGS, "Close the device" },
+    { "get_fd", (PyCFunction)vdp_py_usb_device_get_fd, METH_NOARGS, "Returns event fd" },
     { NULL }
 };
 
