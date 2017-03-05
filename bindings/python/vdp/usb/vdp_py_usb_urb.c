@@ -28,7 +28,12 @@
 
 static void vdp_py_usb_urb_dealloc(struct vdp_py_usb_urb* self)
 {
+    if (!self->completed) {
+        self->urb->status = vdp_usb_urb_status_unlinked;
+        vdp_usb_complete_urb(self->urb);
+    }
     vdp_usb_free_urb(self->urb);
+    Py_DECREF(self->device);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -40,6 +45,8 @@ static PyObject* vdp_py_usb_urb_complete(struct vdp_py_usb_urb* self)
         vdp_py_usb_error_set(res);
         return NULL;
     }
+
+    self->completed = 1;
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -112,12 +119,22 @@ void vdp_py_usb_urb_init(PyObject* module)
     PyModule_AddObject(module, "URB", (PyObject*)&vdp_py_usb_urbtype);
 }
 
-PyObject* vdp_py_usb_urb_new(struct vdp_usb_urb* urb)
+PyObject* vdp_py_usb_urb_new(PyObject* device, struct vdp_usb_urb* urb)
 {
-    return NULL;
+    struct vdp_py_usb_urb* self = (struct vdp_py_usb_urb*)PyObject_New(struct vdp_py_usb_urb, &vdp_py_usb_urbtype);
+
+    Py_INCREF(device);
+    self->device = device;
+    self->urb = urb;
+    self->completed = 0;
+
+    return (PyObject*)self;
 }
 
 struct vdp_py_usb_urb* vdp_py_usb_urb_check(PyObject* obj)
 {
-    return NULL;
+    if (!PyObject_IsInstance(obj, (PyObject*)&vdp_py_usb_urbtype)) {
+        return NULL;
+    }
+    return (struct vdp_py_usb_urb*)obj;
 }

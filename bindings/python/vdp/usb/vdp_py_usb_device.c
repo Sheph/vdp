@@ -25,12 +25,12 @@
 
 #include "vdp_py_usb_device.h"
 #include "vdp_py_usb_error.h"
+#include "vdp_py_usb_event.h"
 
 static void vdp_py_usb_device_dealloc(struct vdp_py_usb_device* self)
 {
-    if (self->device) {
-        vdp_usb_device_close(self->device);
-    }
+    vdp_usb_device_close(self->device);
+    Py_DECREF(self->ctx);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -71,15 +71,6 @@ static PyObject* vdp_py_usb_device_detach(struct vdp_py_usb_device* self)
     return Py_None;
 }
 
-static PyObject* vdp_py_usb_device_close(struct vdp_py_usb_device* self)
-{
-    vdp_usb_device_close(self->device);
-    self->device = NULL;
-
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
 static PyObject* vdp_py_usb_device_get_fd(struct vdp_py_usb_device* self)
 {
     vdp_fd fd;
@@ -94,12 +85,26 @@ static PyObject* vdp_py_usb_device_get_fd(struct vdp_py_usb_device* self)
     return PyLong_FromLong(fd);
 }
 
+static PyObject* vdp_py_usb_device_get_event(struct vdp_py_usb_device* self)
+{
+    struct vdp_usb_event event;
+
+    vdp_usb_result res = vdp_usb_device_get_event(self->device, &event);
+
+    if (res != vdp_usb_success) {
+        vdp_py_usb_error_set(res);
+        return NULL;
+    }
+
+    return vdp_py_usb_event_new((PyObject*)self, &event);
+}
+
 static PyMethodDef vdp_py_usb_device_methods[] =
 {
     { "attach", (PyCFunction)vdp_py_usb_device_attach, METH_VARARGS, "Attach the device to port" },
     { "detach", (PyCFunction)vdp_py_usb_device_detach, METH_NOARGS, "Detach from port" },
-    { "close", (PyCFunction)vdp_py_usb_device_close, METH_NOARGS, "Close the device" },
     { "get_fd", (PyCFunction)vdp_py_usb_device_get_fd, METH_NOARGS, "Returns event fd" },
+    { "get_event", (PyCFunction)vdp_py_usb_device_get_event, METH_NOARGS, "Returns event" },
     { NULL }
 };
 
@@ -147,10 +152,12 @@ void vdp_py_usb_device_init(PyObject* module)
     PyModule_AddObject(module, "Device", (PyObject*)&vdp_py_usb_devicetype);
 }
 
-PyObject* vdp_py_usb_device_new(struct vdp_usb_device* device)
+PyObject* vdp_py_usb_device_new(PyObject* ctx, struct vdp_usb_device* device)
 {
     struct vdp_py_usb_device* self = (struct vdp_py_usb_device*)PyObject_New(struct vdp_py_usb_device, &vdp_py_usb_devicetype);
 
+    Py_INCREF(ctx);
+    self->ctx = ctx;
     self->device = device;
 
     return (PyObject*)self;

@@ -29,7 +29,7 @@
 #include <Python.h>
 #include "vdp/usb.h"
 
-struct vdp_py_usb_event_base
+struct vdp_py_usb_event
 {
     PyObject_HEAD
     struct vdp_usb_event event;
@@ -37,15 +37,18 @@ struct vdp_py_usb_event_base
 
 struct vdp_py_usb_event_common
 {
-    struct vdp_py_usb_event_base base;
+    struct vdp_py_usb_event base;
 };
 
 struct vdp_py_usb_event_urb
 {
-    struct vdp_py_usb_event_base base;
+    struct vdp_py_usb_event base;
     PyObject* urb;
 };
 
 void vdp_py_usb_event_init(PyObject* module);
+
+PyObject* vdp_py_usb_event_new(PyObject* device, const struct vdp_usb_event* event);
+struct vdp_py_usb_event* vdp_py_usb_event_check(PyObject* obj);
 
 #endif

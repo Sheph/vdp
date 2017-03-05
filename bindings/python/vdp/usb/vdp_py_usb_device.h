@@ -32,12 +32,13 @@
 struct vdp_py_usb_device
 {
     PyObject_HEAD
+    PyObject* ctx;
     struct vdp_usb_device* device;
 };
 
 void vdp_py_usb_device_init(PyObject* module);
 
-PyObject* vdp_py_usb_device_new(struct vdp_usb_device* device);
+PyObject* vdp_py_usb_device_new(PyObject* ctx, struct vdp_usb_device* device);
 struct vdp_py_usb_device* vdp_py_usb_device_check(PyObject* obj);
 
 #endif

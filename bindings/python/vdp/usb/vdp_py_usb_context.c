@@ -29,7 +29,9 @@
 
 static void vdp_py_usb_context_dealloc(struct vdp_py_usb_context* self)
 {
-    vdp_usb_cleanup(self->ctx);
+    if (self->ctx) {
+        vdp_usb_cleanup(self->ctx);
+    }
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -76,7 +78,7 @@ static PyObject* vdp_py_usb_context_open_device(struct vdp_py_usb_context* self,
         return NULL;
     }
 
-    return vdp_py_usb_device_new(device);
+    return vdp_py_usb_device_new((PyObject*)self, device);
 }
 
 static PyMethodDef vdp_py_usb_context_methods[] =
