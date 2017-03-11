@@ -256,13 +256,119 @@ static vdp_usb_urb_status vdp_py_usb_filter_get_string_descriptor(void* user_dat
     const struct vdp_usb_string_table** tables)
 {
     struct vdp_py_usb_filter* self = user_data;
+    PyObject* ret;
+    Py_ssize_t cnt, i, j;
 
     if (!self->fn_get_string_descriptor) {
         PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_string_descriptor");
         return vdp_usb_urb_status_stall;
     }
 
-    return vdp_usb_urb_status_stall;
+    ret = PyObject_CallFunction(self->fn_get_string_descriptor, NULL);
+
+    if (!ret) {
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (PyInt_Check(ret)) {
+        return ret_to_status("get_string_descriptor", ret);
+    }
+
+    if (!PyList_Check(ret)) {
+        Py_DECREF(ret);
+        PyErr_Format(PyExc_TypeError, "%s: value not a list", "get_string_descriptor");
+        return vdp_usb_urb_status_stall;
+    }
+
+    cnt = PyList_Size(ret);
+
+    if (cnt > 0) {
+        for (i = 0; self->string_tables && self->string_tables[i].strings != NULL; ++i) {
+            const struct vdp_usb_string* strings = self->string_tables[i].strings;
+            for (j = 0; strings[j].str != NULL; ++j) {
+                free((void*)strings[j].str);
+            }
+            free((void*)strings);
+        }
+        free(self->string_tables);
+
+        self->string_tables = malloc(sizeof(self->string_tables[0]) * (cnt + 1));
+
+        for (i = 0; i < cnt; ++i) {
+            PyObject* table;
+            int language_id = 0;
+            PyObject* strings = NULL;
+            Py_ssize_t strings_cnt;
+            struct vdp_usb_string* tmp;
+
+            self->string_tables[i].language_id = 0;
+            self->string_tables[i].strings = NULL;
+
+            table = PyList_GetItem(ret, i);
+
+            if (!PyTuple_Check(table)) {
+                Py_DECREF(ret);
+                PyErr_Format(PyExc_TypeError, "%s: value not a tuple", "get_string_descriptor");
+                return vdp_usb_urb_status_stall;
+            }
+
+            if (!PyArg_ParseTuple(table, "iO:get_string_descriptor", &language_id, &strings)) {
+                Py_DECREF(ret);
+                return vdp_usb_urb_status_stall;
+            }
+
+            if (!PyList_Check(strings)) {
+                Py_DECREF(ret);
+                PyErr_Format(PyExc_TypeError, "%s: value not a list", "get_string_descriptor");
+                return vdp_usb_urb_status_stall;
+            }
+
+            strings_cnt = PyList_Size(strings);
+
+            self->string_tables[i].language_id = language_id;
+            self->string_tables[i].strings = malloc(sizeof(self->string_tables[i].strings[0]) * (strings_cnt + 1));
+
+            for (j = 0; j < strings_cnt; ++j) {
+                PyObject* str_obj;
+                int index = 0;
+                const char* str;
+                tmp = (struct vdp_usb_string*)&self->string_tables[i].strings[j];
+
+                tmp->index = 0;
+                tmp->str = NULL;
+
+                str_obj = PyList_GetItem(strings, j);
+
+                if (!PyTuple_Check(str_obj)) {
+                    Py_DECREF(ret);
+                    PyErr_Format(PyExc_TypeError, "%s: value not a tuple", "get_string_descriptor");
+                    return vdp_usb_urb_status_stall;
+                }
+
+                if (!PyArg_ParseTuple(str_obj, "is:get_string_descriptor", &index, &str)) {
+                    Py_DECREF(ret);
+                    return vdp_usb_urb_status_stall;
+                }
+
+                tmp->index = index;
+                tmp->str = strdup(str);
+            }
+
+            tmp = (struct vdp_usb_string*)&self->string_tables[i].strings[j];
+
+            tmp->index = 0;
+            tmp->str = NULL;
+        }
+
+        self->string_tables[i].language_id = 0;
+        self->string_tables[i].strings = NULL;
+
+        *tables = self->string_tables;
+    }
+
+    Py_DECREF(ret);
+
+    return vdp_usb_urb_status_completed;
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_set_address(void* user_data,
@@ -406,7 +512,7 @@ static int vdp_py_usb_filter_init_obj(struct vdp_py_usb_filter* self, PyObject* 
 
 static void vdp_py_usb_filter_dealloc(struct vdp_py_usb_filter* self)
 {
-    int i;
+    int i, j;
 
     Py_XDECREF(self->fn_get_device_descriptor);
     Py_XDECREF(self->fn_get_qualifier_descriptor);
@@ -424,6 +530,15 @@ static void vdp_py_usb_filter_dealloc(struct vdp_py_usb_filter* self)
         free(self->descriptors[i]);
     }
     free(self->descriptors);
+
+    for (i = 0; self->string_tables && self->string_tables[i].strings != NULL; ++i) {
+        const struct vdp_usb_string* strings = self->string_tables[i].strings;
+        for (j = 0; strings[j].str != NULL; ++j) {
+            free((void*)strings[j].str);
+        }
+        free((void*)strings);
+    }
+    free(self->string_tables);
 
     Py_TYPE(self)->tp_free((PyObject*)self);
 }

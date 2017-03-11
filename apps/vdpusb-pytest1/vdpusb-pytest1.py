@@ -88,6 +88,9 @@ class TestFilter(vdp.usb.Filter):
             (vdp.usb.HID_DT_HID, struct.pack("<HBBBH", 0x0110, 0, 1, vdp.usb.HID_DT_REPORT, len(test_report_descriptor))),
             (vdp.usb.DT_ENDPOINT, struct.pack("<BBHB", 0x81, vdp.usb.ENDPOINT_XFER_INT, 8, 7))]);
 
+    def get_string_descriptor(self):
+        return [(0x0409, [(1, "Logitech"), (2, "USB-PS/2 Optical Mouse")])];
+
     def set_address(self, address):
         print("set_address(%d)" % (address,));
         return vdp.usb.URB_STATUS_COMPLETED;
