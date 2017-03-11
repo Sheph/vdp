@@ -29,6 +29,7 @@
 #include "vdp_py_usb_device.h"
 #include "vdp_py_usb_event.h"
 #include "vdp_py_usb_filter.h"
+#include "vdp/usb_hid.h"
 
 static PyMethodDef vdp_py_usb_methods[] =
 {
@@ -70,6 +71,51 @@ PyMODINIT_FUNC initusb(void)
     PyModule_AddIntConstant(module, "URB_STATUS_ERROR", vdp_usb_urb_status_error);
     PyModule_AddIntConstant(module, "URB_STATUS_STALL", vdp_usb_urb_status_stall);
     PyModule_AddIntConstant(module, "URB_STATUS_OVERFLOW", vdp_usb_urb_status_overflow);
+
+    PyModule_AddIntConstant(module, "DT_DEVICE", VDP_USB_DT_DEVICE);
+    PyModule_AddIntConstant(module, "DT_CONFIG", VDP_USB_DT_CONFIG);
+    PyModule_AddIntConstant(module, "DT_STRING", VDP_USB_DT_STRING);
+    PyModule_AddIntConstant(module, "DT_INTERFACE", VDP_USB_DT_INTERFACE);
+    PyModule_AddIntConstant(module, "DT_ENDPOINT", VDP_USB_DT_ENDPOINT);
+    PyModule_AddIntConstant(module, "DT_QUALIFIER", VDP_USB_DT_QUALIFIER);
+
+    PyModule_AddIntConstant(module, "CONFIG_ATT_ONE", VDP_USB_CONFIG_ATT_ONE);
+    PyModule_AddIntConstant(module, "CONFIG_ATT_SELFPOWER", VDP_USB_CONFIG_ATT_SELFPOWER);
+    PyModule_AddIntConstant(module, "CONFIG_ATT_WAKEUP", VDP_USB_CONFIG_ATT_WAKEUP);
+    PyModule_AddIntConstant(module, "CONFIG_ATT_BATTERY", VDP_USB_CONFIG_ATT_BATTERY);
+
+    PyModule_AddIntConstant(module, "DT_ENDPOINT_SIZE", VDP_USB_DT_ENDPOINT_SIZE);
+    PyModule_AddIntConstant(module, "DT_ENDPOINT_AUDIO_SIZE", VDP_USB_DT_ENDPOINT_AUDIO_SIZE);
+
+    PyModule_AddIntConstant(module, "ENDPOINT_SYNC_NONE", VDP_USB_ENDPOINT_SYNC_NONE);
+    PyModule_AddIntConstant(module, "ENDPOINT_SYNC_ASYNC", VDP_USB_ENDPOINT_SYNC_ASYNC);
+    PyModule_AddIntConstant(module, "ENDPOINT_SYNC_ADAPTIVE", VDP_USB_ENDPOINT_SYNC_ADAPTIVE);
+    PyModule_AddIntConstant(module, "ENDPOINT_SYNC_SYNC", VDP_USB_ENDPOINT_SYNC_SYNC);
+
+    PyModule_AddIntConstant(module, "ENDPOINT_USAGE_DATA", VDP_USB_ENDPOINT_USAGE_DATA);
+    PyModule_AddIntConstant(module, "ENDPOINT_USAGE_FEEDBACK", VDP_USB_ENDPOINT_USAGE_FEEDBACK);
+    PyModule_AddIntConstant(module, "ENDPOINT_USAGE_IMPLICIT_FB", VDP_USB_ENDPOINT_USAGE_IMPLICIT_FB);
+
+    PyModule_AddIntConstant(module, "ENDPOINT_XFER_CONTROL", VDP_USB_ENDPOINT_XFER_CONTROL);
+    PyModule_AddIntConstant(module, "ENDPOINT_XFER_ISO", VDP_USB_ENDPOINT_XFER_ISO);
+    PyModule_AddIntConstant(module, "ENDPOINT_XFER_BULK", VDP_USB_ENDPOINT_XFER_BULK);
+    PyModule_AddIntConstant(module, "ENDPOINT_XFER_INT", VDP_USB_ENDPOINT_XFER_INT);
+
+    PyModule_AddIntConstant(module, "CLASS_HID", VDP_USB_CLASS_HID);
+    PyModule_AddIntConstant(module, "SUBCLASS_BOOT", VDP_USB_SUBCLASS_BOOT);
+    PyModule_AddIntConstant(module, "PROTOCOL_KEYBOARD", VDP_USB_PROTOCOL_KEYBOARD);
+    PyModule_AddIntConstant(module, "PROTOCOL_MOUSE", VDP_USB_PROTOCOL_MOUSE);
+
+    PyModule_AddIntConstant(module, "HID_REQUEST_GET_REPORT", VDP_USB_HID_REQUEST_GET_REPORT);
+    PyModule_AddIntConstant(module, "HID_REQUEST_GET_IDLE", VDP_USB_HID_REQUEST_GET_IDLE);
+    PyModule_AddIntConstant(module, "HID_REQUEST_GET_PROTOCOL", VDP_USB_HID_REQUEST_GET_PROTOCOL);
+    PyModule_AddIntConstant(module, "HID_REQUEST_SET_REPORT", VDP_USB_HID_REQUEST_SET_REPORT);
+    PyModule_AddIntConstant(module, "HID_REQUEST_SET_IDLE", VDP_USB_HID_REQUEST_SET_IDLE);
+    PyModule_AddIntConstant(module, "HID_REQUEST_SET_PROTOCOL", VDP_USB_HID_REQUEST_SET_PROTOCOL);
+
+    PyModule_AddIntConstant(module, "HID_DT_HID", VDP_USB_HID_DT_HID);
+    PyModule_AddIntConstant(module, "HID_DT_REPORT", VDP_USB_HID_DT_REPORT);
+    PyModule_AddIntConstant(module, "HID_DT_PHYSICAL", VDP_USB_HID_DT_PHYSICAL);
 
     vdp_py_usb_error_init(module);
     vdp_py_usb_context_init(module);

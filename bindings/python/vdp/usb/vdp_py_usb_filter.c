@@ -25,17 +25,130 @@
 
 #include "vdp_py_usb_filter.h"
 #include "vdp_py_usb_urb.h"
+#include "vdp/byte_order.h"
+
+static int getint(const char* func, PyObject* obj, const char* name, int* res)
+{
+    PyObject* name_obj;
+    PyObject* value_obj;
+    int value;
+
+    if (!*res) {
+        return 0;
+    }
+
+    name_obj = PyString_FromString(name);
+    value_obj = PyObject_GetItem(obj, name_obj);
+    Py_DECREF(name_obj);
+    if (!value_obj) {
+        PyErr_Format(PyExc_AttributeError, "%s: attribute '%s' not found", func, name);
+        *res = 0;
+        return 0;
+    }
+
+    if (!PyInt_Check(value_obj)) {
+        Py_DECREF(value_obj);
+        PyErr_Format(PyExc_TypeError, "%s: value of '%s' is not numeric", func, name);
+        *res = 0;
+        return 0;
+    }
+
+    value = PyInt_AsLong(value_obj);
+    Py_DECREF(value_obj);
+
+    return value;
+}
+
+static vdp_usb_urb_status ret_to_status(const char* fn_name, PyObject* ret)
+{
+    int status = PyInt_AsLong(ret);
+    Py_DECREF(ret);
+
+    if (!vdp_usb_urb_status_validate(status)) {
+        PyErr_Format(PyExc_ValueError, "%s: invalid status value", fn_name);
+        return vdp_usb_urb_status_stall;
+    }
+
+    return status;
+}
 
 static vdp_usb_urb_status vdp_py_usb_filter_get_device_descriptor(void* user_data,
     struct vdp_usb_device_descriptor* descriptor)
 {
-    return vdp_usb_urb_status_error;
+    struct vdp_py_usb_filter* self = user_data;
+    PyObject* ret;
+    int res = 1;
+
+    if (!self->fn_get_device_descriptor) {
+        PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_device_descriptor");
+        return vdp_usb_urb_status_stall;
+    }
+
+    ret = PyObject_CallFunction(self->fn_get_device_descriptor, NULL);
+
+    if (!ret) {
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (PyInt_Check(ret)) {
+        return ret_to_status("get_device_descriptor", ret);
+    }
+
+    descriptor->bLength = sizeof(*descriptor);
+    descriptor->bDescriptorType = getint("get_device_descriptor", ret, "bDescriptorType", &res);
+    descriptor->bcdUSB = vdp_cpu_to_u16le(getint("get_device_descriptor", ret, "bcdUSB", &res));
+    descriptor->bDeviceClass = getint("get_device_descriptor", ret, "bDeviceClass", &res);
+    descriptor->bDeviceSubClass = getint("get_device_descriptor", ret, "bDeviceSubClass", &res);
+    descriptor->bDeviceProtocol = getint("get_device_descriptor", ret, "bDeviceProtocol", &res);
+    descriptor->bMaxPacketSize0 = getint("get_device_descriptor", ret, "bMaxPacketSize0", &res);
+    descriptor->idVendor = vdp_cpu_to_u16le(getint("get_device_descriptor", ret, "idVendor", &res));
+    descriptor->idProduct = vdp_cpu_to_u16le(getint("get_device_descriptor", ret, "idProduct", &res));
+    descriptor->bcdDevice = vdp_cpu_to_u16le(getint("get_device_descriptor", ret, "bcdDevice", &res));
+    descriptor->iManufacturer = getint("get_device_descriptor", ret, "iManufacturer", &res);
+    descriptor->iProduct = getint("get_device_descriptor", ret, "iProduct", &res);
+    descriptor->iSerialNumber = getint("get_device_descriptor", ret, "iSerialNumber", &res);
+    descriptor->bNumConfigurations = getint("get_device_descriptor", ret, "bNumConfigurations", &res);
+
+    Py_DECREF(ret);
+
+    return res ? vdp_usb_urb_status_completed : vdp_usb_urb_status_stall;
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_get_qualifier_descriptor(void* user_data,
     struct vdp_usb_qualifier_descriptor* descriptor)
 {
-    return vdp_usb_urb_status_error;
+    struct vdp_py_usb_filter* self = user_data;
+    PyObject* ret;
+    int res = 1;
+
+    if (!self->fn_get_qualifier_descriptor) {
+        PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_qualifier_descriptor");
+        return vdp_usb_urb_status_stall;
+    }
+
+    ret = PyObject_CallFunction(self->fn_get_qualifier_descriptor, NULL);
+
+    if (!ret) {
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (PyInt_Check(ret)) {
+        return ret_to_status("get_qualifier_descriptor", ret);
+    }
+
+    descriptor->bLength = sizeof(*descriptor);
+    descriptor->bDescriptorType = getint("get_qualifier_descriptor", ret, "bDescriptorType", &res);
+    descriptor->bcdUSB = vdp_cpu_to_u16le(getint("get_qualifier_descriptor", ret, "bcdUSB", &res));
+    descriptor->bDeviceClass = getint("get_qualifier_descriptor", ret, "bDeviceClass", &res);
+    descriptor->bDeviceSubClass = getint("get_qualifier_descriptor", ret, "bDeviceSubClass", &res);
+    descriptor->bDeviceProtocol = getint("get_qualifier_descriptor", ret, "bDeviceProtocol", &res);
+    descriptor->bMaxPacketSize0 = getint("get_qualifier_descriptor", ret, "bMaxPacketSize0", &res);
+    descriptor->bNumConfigurations = getint("get_qualifier_descriptor", ret, "bNumConfigurations", &res);
+    descriptor->bRESERVED = 0;
+
+    Py_DECREF(ret);
+
+    return res ? vdp_usb_urb_status_completed : vdp_usb_urb_status_stall;
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_get_config_descriptor(void* user_data,
@@ -43,56 +156,218 @@ static vdp_usb_urb_status vdp_py_usb_filter_get_config_descriptor(void* user_dat
     struct vdp_usb_config_descriptor* descriptor,
     struct vdp_usb_descriptor_header*** other)
 {
-    return vdp_usb_urb_status_error;
+    struct vdp_py_usb_filter* self = user_data;
+    PyObject* ret;
+    PyObject* ret_descriptor = NULL;
+    PyObject* ret_other = NULL;
+    int res = 1;
+
+    if (!self->fn_get_config_descriptor) {
+        PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_config_descriptor");
+        return vdp_usb_urb_status_stall;
+    }
+
+    ret = PyObject_CallFunction(self->fn_get_config_descriptor, "i", (int)index);
+
+    if (!ret) {
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (PyInt_Check(ret)) {
+        return ret_to_status("get_config_descriptor", ret);
+    }
+
+    if (PyTuple_Check(ret)) {
+        if (!PyArg_ParseTuple(ret, "O|O:get_config_descriptor", &ret_descriptor, &ret_other)) {
+            Py_DECREF(ret);
+            return vdp_usb_urb_status_stall;
+        }
+    } else {
+        ret_descriptor = ret;
+    }
+
+    if (ret_other) {
+        Py_ssize_t cnt, i;
+
+        if (!PyList_Check(ret_other)) {
+            Py_DECREF(ret);
+            PyErr_Format(PyExc_TypeError, "%s: value not a list", "get_config_descriptor");
+            return vdp_usb_urb_status_stall;
+        }
+
+        cnt = PyList_Size(ret_other);
+
+        if (cnt > 0) {
+            for (i = 0; self->descriptors && self->descriptors[i]; ++i) {
+                free(self->descriptors[i]);
+            }
+            free(self->descriptors);
+
+            self->descriptors = malloc(sizeof(self->descriptors[0]) * (cnt + 1));
+
+            for (i = 0; i < cnt; ++i) {
+                PyObject* desc;
+                int desc_type = 0;
+                const char* desc_data = NULL;
+                int desc_data_size = 0;
+
+                self->descriptors[i] = NULL;
+
+                desc = PyList_GetItem(ret_other, i);
+
+                if (!PyTuple_Check(desc)) {
+                    Py_DECREF(ret);
+                    PyErr_Format(PyExc_TypeError, "%s: value not a tuple", "get_config_descriptor");
+                    return vdp_usb_urb_status_stall;
+                }
+
+                if (!PyArg_ParseTuple(desc, "it#:get_config_descriptor", &desc_type, &desc_data, &desc_data_size)) {
+                    Py_DECREF(ret);
+                    return vdp_usb_urb_status_stall;
+                }
+
+                self->descriptors[i] = malloc(sizeof(*self->descriptors[0]) + desc_data_size);
+
+                self->descriptors[i]->bDescriptorType = desc_type;
+                self->descriptors[i]->bLength = sizeof(*self->descriptors[0]) + desc_data_size;
+                memcpy(self->descriptors[i] + 1, desc_data, desc_data_size);
+            }
+
+            self->descriptors[i] = NULL;
+
+            *other = self->descriptors;
+        }
+    }
+
+    descriptor->bLength = sizeof(*descriptor);
+    descriptor->bDescriptorType = getint("get_config_descriptor", ret_descriptor, "bDescriptorType", &res);
+    descriptor->bNumInterfaces = getint("get_config_descriptor", ret_descriptor, "bNumInterfaces", &res);
+    descriptor->bConfigurationValue = getint("get_config_descriptor", ret_descriptor, "bConfigurationValue", &res);
+    descriptor->iConfiguration = getint("get_config_descriptor", ret_descriptor, "iConfiguration", &res);
+    descriptor->bmAttributes = getint("get_config_descriptor", ret_descriptor, "bmAttributes", &res);
+    descriptor->bMaxPower = getint("get_config_descriptor", ret_descriptor, "bMaxPower", &res);
+
+    Py_DECREF(ret);
+
+    return res ? vdp_usb_urb_status_completed : vdp_usb_urb_status_stall;
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_get_string_descriptor(void* user_data,
     const struct vdp_usb_string_table** tables)
 {
-    return vdp_usb_urb_status_error;
+    struct vdp_py_usb_filter* self = user_data;
+
+    if (!self->fn_get_string_descriptor) {
+        PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_string_descriptor");
+        return vdp_usb_urb_status_stall;
+    }
+
+    return vdp_usb_urb_status_stall;
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_set_address(void* user_data,
     vdp_u16 address)
 {
-    return vdp_usb_urb_status_error;
+    struct vdp_py_usb_filter* self = user_data;
+    PyObject* ret;
+
+    if (!self->fn_set_address) {
+        PyErr_Format(PyExc_AttributeError, "'%s' not found", "set_address");
+        return vdp_usb_urb_status_stall;
+    }
+
+    ret = PyObject_CallFunction(self->fn_set_address, "i", (int)address);
+
+    if (!ret) {
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (!PyInt_Check(ret)) {
+        PyErr_SetString(PyExc_TypeError, "value is not numeric");
+        Py_DECREF(ret);
+        return vdp_usb_urb_status_stall;
+    }
+
+    return ret_to_status("set_address", ret);
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_set_configuration(void* user_data,
     vdp_u8 configuration)
 {
-    return vdp_usb_urb_status_error;
+    struct vdp_py_usb_filter* self = user_data;
+
+    if (!self->fn_set_configuration) {
+        PyErr_Format(PyExc_AttributeError, "'%s' not found", "set_configuration");
+        return vdp_usb_urb_status_stall;
+    }
+
+    return vdp_usb_urb_status_stall;
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_get_status(void* user_data,
     vdp_u8 recipient, vdp_u8 index, vdp_u16* status)
 {
-    return vdp_usb_urb_status_error;
+    struct vdp_py_usb_filter* self = user_data;
+
+    if (!self->fn_get_status) {
+        PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_status");
+        return vdp_usb_urb_status_stall;
+    }
+
+    return vdp_usb_urb_status_stall;
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_enable_feature(void* user_data,
     vdp_u8 recipient, vdp_u8 index, vdp_u16 feature, int enable)
 {
-    return vdp_usb_urb_status_error;
+    struct vdp_py_usb_filter* self = user_data;
+
+    if (!self->fn_enable_feature) {
+        PyErr_Format(PyExc_AttributeError, "'%s' not found", "enable_feature");
+        return vdp_usb_urb_status_stall;
+    }
+
+    return vdp_usb_urb_status_stall;
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_get_interface(void* user_data,
     vdp_u8 interface, vdp_u8* alt_setting)
 {
-    return vdp_usb_urb_status_error;
+    struct vdp_py_usb_filter* self = user_data;
+
+    if (!self->fn_get_interface) {
+        PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_interface");
+        return vdp_usb_urb_status_stall;
+    }
+
+    return vdp_usb_urb_status_stall;
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_set_interface(void* user_data,
     vdp_u8 interface, vdp_u8 alt_setting)
 {
-    return vdp_usb_urb_status_error;
+    struct vdp_py_usb_filter* self = user_data;
+
+    if (!self->fn_set_interface) {
+        PyErr_Format(PyExc_AttributeError, "'%s' not found", "set_interface");
+        return vdp_usb_urb_status_stall;
+    }
+
+    return vdp_usb_urb_status_stall;
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_set_descriptor(void* user_data,
     vdp_u16 value, vdp_u16 index, const vdp_byte* data,
     vdp_u32 len)
 {
-    return vdp_usb_urb_status_error;
+    struct vdp_py_usb_filter* self = user_data;
+
+    if (!self->fn_set_descriptor) {
+        PyErr_Format(PyExc_AttributeError, "'%s' not found", "set_descriptor");
+        return vdp_usb_urb_status_stall;
+    }
+
+    return vdp_usb_urb_status_stall;
 }
 
 static struct vdp_usb_filter_ops vdp_py_usb_filter_ops =
@@ -131,6 +406,8 @@ static int vdp_py_usb_filter_init_obj(struct vdp_py_usb_filter* self, PyObject* 
 
 static void vdp_py_usb_filter_dealloc(struct vdp_py_usb_filter* self)
 {
+    int i;
+
     Py_XDECREF(self->fn_get_device_descriptor);
     Py_XDECREF(self->fn_get_qualifier_descriptor);
     Py_XDECREF(self->fn_get_config_descriptor);
@@ -143,6 +420,11 @@ static void vdp_py_usb_filter_dealloc(struct vdp_py_usb_filter* self)
     Py_XDECREF(self->fn_set_interface);
     Py_XDECREF(self->fn_set_descriptor);
 
+    for (i = 0; self->descriptors && self->descriptors[i]; ++i) {
+        free(self->descriptors[i]);
+    }
+    free(self->descriptors);
+
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -151,6 +433,7 @@ static PyObject* vdp_py_usb_filter_filter(struct vdp_py_usb_filter* self, PyObje
     PyObject* urb_obj = NULL;
     struct vdp_py_usb_urb* py_urb = NULL;
     struct vdp_py_usb_urb_wrapper* urb_wrapper;
+    int res;
 
     if (!PyArg_ParseTuple(args, "O", &urb_obj)) {
         return NULL;
@@ -164,7 +447,13 @@ static PyObject* vdp_py_usb_filter_filter(struct vdp_py_usb_filter* self, PyObje
 
     urb_wrapper = (struct vdp_py_usb_urb_wrapper*)py_urb->urb_wrapper;
 
-    if (vdp_usb_filter(urb_wrapper->urb, &vdp_py_usb_filter_ops, self)) {
+    res = vdp_usb_filter(urb_wrapper->urb, &vdp_py_usb_filter_ops, self);
+
+    if (PyErr_Occurred()) {
+        return NULL;
+    }
+
+    if (res) {
         Py_INCREF(Py_True);
         return Py_True;
     } else {

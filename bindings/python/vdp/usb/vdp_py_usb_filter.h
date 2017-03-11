@@ -43,6 +43,8 @@ struct vdp_py_usb_filter
     PyObject* fn_get_interface;
     PyObject* fn_set_interface;
     PyObject* fn_set_descriptor;
+
+    struct vdp_usb_descriptor_header** descriptors;
 };
 
 void vdp_py_usb_filter_init(PyObject* module);
