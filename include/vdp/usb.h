@@ -189,6 +189,8 @@ typedef enum
     vdp_usb_urb_status_overflow = 5    /* Endpoint returns more data than expected. */
 } vdp_usb_urb_status;
 
+int vdp_usb_urb_status_validate(int value);
+
 struct vdp_usb_iso_packet
 {
     vdp_byte* buffer;

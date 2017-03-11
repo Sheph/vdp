@@ -11,6 +11,8 @@ set(SRC
     vdp/usb/vdp_py_usb_urb.h
     vdp/usb/vdp_py_usb_error.c
     vdp/usb/vdp_py_usb_error.h
+    vdp/usb/vdp_py_usb_filter.c
+    vdp/usb/vdp_py_usb_filter.h
 )
 
 set(VDP_PY_CFLAGS '-Wall')

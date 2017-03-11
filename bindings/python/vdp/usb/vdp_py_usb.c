@@ -28,6 +28,7 @@
 #include "vdp_py_usb_context.h"
 #include "vdp_py_usb_device.h"
 #include "vdp_py_usb_event.h"
+#include "vdp_py_usb_filter.h"
 
 static PyMethodDef vdp_py_usb_methods[] =
 {
@@ -58,9 +59,22 @@ PyMODINIT_FUNC initusb(void)
     PyModule_AddIntConstant(module, "SIGNAL_POWER_ON", vdp_usb_signal_power_on);
     PyModule_AddIntConstant(module, "SIGNAL_POWER_OFF", vdp_usb_signal_power_off);
 
+    PyModule_AddIntConstant(module, "URB_CONTROL", vdp_usb_urb_control);
+    PyModule_AddIntConstant(module, "URB_ISO", vdp_usb_urb_iso);
+    PyModule_AddIntConstant(module, "URB_BULK", vdp_usb_urb_bulk);
+    PyModule_AddIntConstant(module, "URB_INT", vdp_usb_urb_int);
+
+    PyModule_AddIntConstant(module, "URB_STATUS_UNDEFINED", vdp_usb_urb_status_undefined);
+    PyModule_AddIntConstant(module, "URB_STATUS_COMPLETED", vdp_usb_urb_status_completed);
+    PyModule_AddIntConstant(module, "URB_STATUS_UNLINKED", vdp_usb_urb_status_unlinked);
+    PyModule_AddIntConstant(module, "URB_STATUS_ERROR", vdp_usb_urb_status_error);
+    PyModule_AddIntConstant(module, "URB_STATUS_STALL", vdp_usb_urb_status_stall);
+    PyModule_AddIntConstant(module, "URB_STATUS_OVERFLOW", vdp_usb_urb_status_overflow);
+
     vdp_py_usb_error_init(module);
     vdp_py_usb_context_init(module);
     vdp_py_usb_urb_init(module);
     vdp_py_usb_device_init(module);
     vdp_py_usb_event_init(module);
+    vdp_py_usb_filter_init(module);
 }

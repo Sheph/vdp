@@ -157,6 +157,7 @@ static int vdp_py_usb_event_urb_init_obj(struct vdp_py_usb_event_urb* self, PyOb
 {
     PyObject* urb_obj = NULL;
     struct vdp_py_usb_urb* py_urb = NULL;
+    struct vdp_py_usb_urb_wrapper* urb_wrapper;
 
     if (vdp_py_usb_eventtype.tp_init((PyObject*)self, args, kwargs) < 0) {
         return -1;
@@ -172,8 +173,10 @@ static int vdp_py_usb_event_urb_init_obj(struct vdp_py_usb_event_urb* self, PyOb
         return -1;
     }
 
+    urb_wrapper = (struct vdp_py_usb_urb_wrapper*)py_urb->urb_wrapper;
+
     self->base.event.type = vdp_usb_event_urb;
-    self->base.event.data.urb = py_urb->urb;
+    self->base.event.data.urb = urb_wrapper->urb;
 
     Py_INCREF(urb_obj);
     self->urb = urb_obj;

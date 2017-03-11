@@ -41,6 +41,21 @@ int vdp_usb_signal_type_validate(int value)
     }
 }
 
+int vdp_usb_urb_status_validate(int value)
+{
+    switch (value) {
+    case vdp_usb_urb_status_undefined:
+    case vdp_usb_urb_status_completed:
+    case vdp_usb_urb_status_unlinked:
+    case vdp_usb_urb_status_error:
+    case vdp_usb_urb_status_stall:
+    case vdp_usb_urb_status_overflow:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 const char* vdp_usb_result_to_str(vdp_usb_result res)
 {
     switch (res) {
