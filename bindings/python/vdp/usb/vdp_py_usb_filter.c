@@ -401,13 +401,26 @@ static vdp_usb_urb_status vdp_py_usb_filter_set_configuration(void* user_data,
     vdp_u8 configuration)
 {
     struct vdp_py_usb_filter* self = user_data;
+    PyObject* ret;
 
     if (!self->fn_set_configuration) {
         PyErr_Format(PyExc_AttributeError, "'%s' not found", "set_configuration");
         return vdp_usb_urb_status_stall;
     }
 
-    return vdp_usb_urb_status_stall;
+    ret = PyObject_CallFunction(self->fn_set_configuration, "i", (int)configuration);
+
+    if (!ret) {
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (!PyInt_Check(ret)) {
+        PyErr_SetString(PyExc_TypeError, "value is not numeric");
+        Py_DECREF(ret);
+        return vdp_usb_urb_status_stall;
+    }
+
+    return ret_to_status("set_configuration", ret);
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_get_status(void* user_data,
