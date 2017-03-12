@@ -29,6 +29,7 @@
 #include "vdp_py_usb_device.h"
 #include "vdp_py_usb_event.h"
 #include "vdp_py_usb_filter.h"
+#include "vdp_py_usb_gadget.h"
 #include "vdp/usb_hid.h"
 
 static PyMethodDef vdp_py_usb_methods[] =
@@ -165,4 +166,5 @@ PyMODINIT_FUNC initusb(void)
     vdp_py_usb_device_init(module);
     vdp_py_usb_event_init(module);
     vdp_py_usb_filter_init(module);
+    vdp_py_usb_gadget_init(module);
 }
