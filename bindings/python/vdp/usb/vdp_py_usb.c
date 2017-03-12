@@ -55,6 +55,11 @@ PyMODINIT_FUNC initusb(void)
     PyModule_AddIntConstant(module, "SPEED_FULL", vdp_usb_speed_full);
     PyModule_AddIntConstant(module, "SPEED_HIGH", vdp_usb_speed_high);
 
+    PyModule_AddIntConstant(module, "EVENT_NONE", vdp_usb_event_none);
+    PyModule_AddIntConstant(module, "EVENT_SIGNAL", vdp_usb_event_signal);
+    PyModule_AddIntConstant(module, "EVENT_URB", vdp_usb_event_urb);
+    PyModule_AddIntConstant(module, "EVENT_UNLINK_URB", vdp_usb_event_unlink_urb);
+
     PyModule_AddIntConstant(module, "SIGNAL_RESET_START", vdp_usb_signal_reset_start);
     PyModule_AddIntConstant(module, "SIGNAL_RESET_END", vdp_usb_signal_reset_end);
     PyModule_AddIntConstant(module, "SIGNAL_POWER_ON", vdp_usb_signal_power_on);
@@ -151,6 +156,8 @@ PyMODINIT_FUNC initusb(void)
     PyModule_AddIntConstant(module, "HID_DT_HID", VDP_USB_HID_DT_HID);
     PyModule_AddIntConstant(module, "HID_DT_REPORT", VDP_USB_HID_DT_REPORT);
     PyModule_AddIntConstant(module, "HID_DT_PHYSICAL", VDP_USB_HID_DT_PHYSICAL);
+
+    PyModule_AddIntConstant(module, "URB_ZERO_PACKET", VDP_USB_URB_ZERO_PACKET);
 
     vdp_py_usb_error_init(module);
     vdp_py_usb_context_init(module);

@@ -427,52 +427,144 @@ static vdp_usb_urb_status vdp_py_usb_filter_get_status(void* user_data,
     vdp_u8 recipient, vdp_u8 index, vdp_u16* status)
 {
     struct vdp_py_usb_filter* self = user_data;
+    PyObject* ret;
+    int ret_urb_status, ret_status = 0;
 
     if (!self->fn_get_status) {
         PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_status");
         return vdp_usb_urb_status_stall;
     }
 
-    return vdp_usb_urb_status_stall;
+    ret = PyObject_CallFunction(self->fn_get_status, "ii", (int)recipient, (int)index);
+
+    if (!ret) {
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (PyInt_Check(ret)) {
+        return ret_to_status("get_status", ret);
+    }
+
+    if (!PyTuple_Check(ret)) {
+        Py_DECREF(ret);
+        PyErr_Format(PyExc_TypeError, "%s: value not a tuple", "get_status");
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (!PyArg_ParseTuple(ret, "i|i:get_status", &ret_urb_status, &ret_status)) {
+        Py_DECREF(ret);
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (!vdp_usb_urb_status_validate(ret_urb_status)) {
+        Py_DECREF(ret);
+        PyErr_Format(PyExc_ValueError, "%s: invalid status value", "get_status");
+        return vdp_usb_urb_status_stall;
+    }
+
+    *status = ret_status;
+
+    Py_DECREF(ret);
+
+    return ret_urb_status;
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_enable_feature(void* user_data,
     vdp_u8 recipient, vdp_u8 index, vdp_u16 feature, int enable)
 {
     struct vdp_py_usb_filter* self = user_data;
+    PyObject* ret;
 
     if (!self->fn_enable_feature) {
         PyErr_Format(PyExc_AttributeError, "'%s' not found", "enable_feature");
         return vdp_usb_urb_status_stall;
     }
 
-    return vdp_usb_urb_status_stall;
+    ret = PyObject_CallFunction(self->fn_enable_feature, "iiii", (int)recipient, (int)index, (int)feature, (int)enable);
+
+    if (!ret) {
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (!PyInt_Check(ret)) {
+        PyErr_SetString(PyExc_TypeError, "value is not numeric");
+        Py_DECREF(ret);
+        return vdp_usb_urb_status_stall;
+    }
+
+    return ret_to_status("enable_feature", ret);
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_get_interface(void* user_data,
     vdp_u8 interface, vdp_u8* alt_setting)
 {
     struct vdp_py_usb_filter* self = user_data;
+    PyObject* ret;
+    int ret_urb_status, ret_alt_setting = 0;
 
     if (!self->fn_get_interface) {
         PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_interface");
         return vdp_usb_urb_status_stall;
     }
 
-    return vdp_usb_urb_status_stall;
+    ret = PyObject_CallFunction(self->fn_get_interface, "i", (int)interface);
+
+    if (!ret) {
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (PyInt_Check(ret)) {
+        return ret_to_status("get_interface", ret);
+    }
+
+    if (!PyTuple_Check(ret)) {
+        Py_DECREF(ret);
+        PyErr_Format(PyExc_TypeError, "%s: value not a tuple", "get_interface");
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (!PyArg_ParseTuple(ret, "i|i:get_interface", &ret_urb_status, &ret_alt_setting)) {
+        Py_DECREF(ret);
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (!vdp_usb_urb_status_validate(ret_urb_status)) {
+        Py_DECREF(ret);
+        PyErr_Format(PyExc_ValueError, "%s: invalid status value", "get_interface");
+        return vdp_usb_urb_status_stall;
+    }
+
+    *alt_setting = ret_alt_setting;
+
+    Py_DECREF(ret);
+
+    return ret_urb_status;
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_set_interface(void* user_data,
     vdp_u8 interface, vdp_u8 alt_setting)
 {
     struct vdp_py_usb_filter* self = user_data;
+    PyObject* ret;
 
     if (!self->fn_set_interface) {
         PyErr_Format(PyExc_AttributeError, "'%s' not found", "set_interface");
         return vdp_usb_urb_status_stall;
     }
 
-    return vdp_usb_urb_status_stall;
+    ret = PyObject_CallFunction(self->fn_set_interface, "ii", (int)interface, (int)alt_setting);
+
+    if (!ret) {
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (!PyInt_Check(ret)) {
+        PyErr_SetString(PyExc_TypeError, "value is not numeric");
+        Py_DECREF(ret);
+        return vdp_usb_urb_status_stall;
+    }
+
+    return ret_to_status("set_interface", ret);
 }
 
 static vdp_usb_urb_status vdp_py_usb_filter_set_descriptor(void* user_data,
@@ -480,13 +572,26 @@ static vdp_usb_urb_status vdp_py_usb_filter_set_descriptor(void* user_data,
     vdp_u32 len)
 {
     struct vdp_py_usb_filter* self = user_data;
+    PyObject* ret;
 
     if (!self->fn_set_descriptor) {
         PyErr_Format(PyExc_AttributeError, "'%s' not found", "set_descriptor");
         return vdp_usb_urb_status_stall;
     }
 
-    return vdp_usb_urb_status_stall;
+    ret = PyObject_CallFunction(self->fn_set_descriptor, "iis#", (int)value, (int)index, data, (int)len);
+
+    if (!ret) {
+        return vdp_usb_urb_status_stall;
+    }
+
+    if (!PyInt_Check(ret)) {
+        PyErr_SetString(PyExc_TypeError, "value is not numeric");
+        Py_DECREF(ret);
+        return vdp_usb_urb_status_stall;
+    }
+
+    return ret_to_status("set_descriptor", ret);
 }
 
 static struct vdp_usb_filter_ops vdp_py_usb_filter_ops =

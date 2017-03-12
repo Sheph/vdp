@@ -259,19 +259,6 @@ static PyObject* vdp_py_usb_urb_get_transfer_length(struct vdp_py_usb_urb* self,
     return PyLong_FromLong(urb_wrapper->urb->transfer_length);
 }
 
-static int vdp_py_usb_urb_set_transfer_length(struct vdp_py_usb_urb* self, PyObject* value, void* closure)
-{
-    struct vdp_py_usb_urb_wrapper* urb_wrapper =
-        (struct vdp_py_usb_urb_wrapper*)self->urb_wrapper;
-
-    if (value && PyInt_Check(value)) {
-        urb_wrapper->urb->transfer_length = PyInt_AsLong(value);
-        return 0;
-    }
-    PyErr_SetString(PyExc_TypeError, "value is not numeric");
-    return -1;
-}
-
 static PyObject* vdp_py_usb_urb_get_actual_length(struct vdp_py_usb_urb* self, void* closure)
 {
     struct vdp_py_usb_urb_wrapper* urb_wrapper =
@@ -301,17 +288,28 @@ static PyObject* vdp_py_usb_urb_get_interval(struct vdp_py_usb_urb* self, void* 
     return PyLong_FromLong(urb_wrapper->urb->interval);
 }
 
-static int vdp_py_usb_urb_set_interval(struct vdp_py_usb_urb* self, PyObject* value, void* closure)
+static PyObject* vdp_py_usb_urb_get_flags(struct vdp_py_usb_urb* self, void* closure)
 {
     struct vdp_py_usb_urb_wrapper* urb_wrapper =
         (struct vdp_py_usb_urb_wrapper*)self->urb_wrapper;
 
-    if (value && PyInt_Check(value)) {
-        urb_wrapper->urb->interval = PyInt_AsLong(value);
-        return 0;
-    }
-    PyErr_SetString(PyExc_TypeError, "value is not numeric");
-    return -1;
+    return PyLong_FromLong(urb_wrapper->urb->flags);
+}
+
+static PyObject* vdp_py_usb_urb_get_endpoint_address(struct vdp_py_usb_urb* self, void* closure)
+{
+    struct vdp_py_usb_urb_wrapper* urb_wrapper =
+        (struct vdp_py_usb_urb_wrapper*)self->urb_wrapper;
+
+    return PyLong_FromLong(urb_wrapper->urb->endpoint_address);
+}
+
+static PyObject* vdp_py_usb_urb_get_number_of_packets(struct vdp_py_usb_urb* self, void* closure)
+{
+    struct vdp_py_usb_urb_wrapper* urb_wrapper =
+        (struct vdp_py_usb_urb_wrapper*)self->urb_wrapper;
+
+    return PyLong_FromLong(urb_wrapper->urb->number_of_packets);
 }
 
 static PyGetSetDef vdp_py_usb_urb_getset[] =
@@ -319,9 +317,12 @@ static PyGetSetDef vdp_py_usb_urb_getset[] =
     { "id", (getter)vdp_py_usb_urb_get_id, NULL, "sequence id" },
     { "type", (getter)vdp_py_usb_urb_get_type, NULL, "type" },
     { "status", (getter)vdp_py_usb_urb_get_status, (setter)vdp_py_usb_urb_set_status, "status" },
-    { "transfer_length", (getter)vdp_py_usb_urb_get_transfer_length, (setter)vdp_py_usb_urb_set_transfer_length, "transfer_length" },
+    { "transfer_length", (getter)vdp_py_usb_urb_get_transfer_length, NULL, "transfer_length" },
     { "actual_length", (getter)vdp_py_usb_urb_get_actual_length, (setter)vdp_py_usb_urb_set_actual_length, "actual_length" },
-    { "interval", (getter)vdp_py_usb_urb_get_interval, (setter)vdp_py_usb_urb_set_interval, "interval" },
+    { "interval", (getter)vdp_py_usb_urb_get_interval, NULL, "interval" },
+    { "flags", (getter)vdp_py_usb_urb_get_flags, NULL, "flags" },
+    { "endpoint_address", (getter)vdp_py_usb_urb_get_endpoint_address, NULL, "endpoint_address" },
+    { "number_of_packets", (getter)vdp_py_usb_urb_get_number_of_packets, NULL, "number_of_packets" },
     { NULL }
 };
 
@@ -427,6 +428,75 @@ static PyTypeObject vdp_py_usb_control_setuptype =
     vdp_py_usb_control_setup_getset, /* tp_getset */
 };
 
+static Py_ssize_t vdp_py_usb_iso_packet_getreadbuf(struct vdp_py_usb_iso_packet* self, Py_ssize_t index, const void** ptr)
+{
+    if (index != 0) {
+        PyErr_SetString(PyExc_SystemError, "accessing non-existent segment");
+        return -1;
+    }
+
+    *ptr = self->iso_packet->buffer;
+    return self->iso_packet->length;
+}
+
+static Py_ssize_t vdp_py_usb_iso_packet_getwritebuf(struct vdp_py_usb_iso_packet* self, Py_ssize_t index, const void** ptr)
+{
+    struct vdp_py_usb_urb_wrapper* urb_wrapper =
+        (struct vdp_py_usb_urb_wrapper*)self->urb_wrapper;
+
+    if (index != 0) {
+        PyErr_SetString(PyExc_SystemError, "accessing non-existent segment");
+        return -1;
+    }
+
+    if (VDP_USB_URB_ENDPOINT_OUT(urb_wrapper->urb->endpoint_address)) {
+        return -1;
+    }
+
+    *ptr = self->iso_packet->buffer;
+    return self->iso_packet->length;
+}
+
+static Py_ssize_t vdp_py_usb_iso_packet_getsegcount(struct vdp_py_usb_iso_packet* self, Py_ssize_t* lenp)
+{
+    if (lenp) {
+        *lenp = self->iso_packet->length;
+    }
+
+    return 1;
+}
+
+static Py_ssize_t vdp_py_usb_iso_packet_getcharbuffer(struct vdp_py_usb_iso_packet* self, Py_ssize_t index, const void **ptr)
+{
+    if (index != 0) {
+        PyErr_SetString(PyExc_SystemError, "accessing non-existent segment");
+        return -1;
+    }
+
+    *ptr = self->iso_packet->buffer;
+    return self->iso_packet->length;
+}
+
+static int vdp_py_usb_iso_packet_getbuffer(struct vdp_py_usb_iso_packet* self, Py_buffer* view, int flags)
+{
+    struct vdp_py_usb_urb_wrapper* urb_wrapper =
+        (struct vdp_py_usb_urb_wrapper*)self->urb_wrapper;
+
+    return PyBuffer_FillInfo(view, (PyObject*)self,
+        self->iso_packet->buffer, self->iso_packet->length,
+        VDP_USB_URB_ENDPOINT_OUT(urb_wrapper->urb->endpoint_address), flags);
+}
+
+static PyBufferProcs vdp_py_usb_iso_packet_as_buffer =
+{
+    (readbufferproc)vdp_py_usb_iso_packet_getreadbuf,
+    (writebufferproc)vdp_py_usb_iso_packet_getwritebuf,
+    (segcountproc)vdp_py_usb_iso_packet_getsegcount,
+    (charbufferproc)vdp_py_usb_iso_packet_getcharbuffer,
+    (getbufferproc)vdp_py_usb_iso_packet_getbuffer,
+    0,
+};
+
 static void vdp_py_usb_iso_packet_dealloc(struct vdp_py_usb_iso_packet* self)
 {
     Py_DECREF(self->urb_wrapper);
@@ -457,9 +527,31 @@ static int vdp_py_usb_iso_packet_set_status(struct vdp_py_usb_iso_packet* self, 
     return -1;
 }
 
+static PyObject* vdp_py_usb_iso_packet_get_actual_length(struct vdp_py_usb_iso_packet* self, void* closure)
+{
+    return PyLong_FromLong(self->iso_packet->actual_length);
+}
+
+static int vdp_py_usb_iso_packet_set_actual_length(struct vdp_py_usb_iso_packet* self, PyObject* value, void* closure)
+{
+    if (value && PyInt_Check(value)) {
+        self->iso_packet->actual_length = PyInt_AsLong(value);
+        return 0;
+    }
+    PyErr_SetString(PyExc_TypeError, "value is not numeric");
+    return -1;
+}
+
+static PyObject* vdp_py_usb_iso_packet_get_length(struct vdp_py_usb_iso_packet* self, void* closure)
+{
+    return PyLong_FromLong(self->iso_packet->length);
+}
+
 static PyGetSetDef vdp_py_usb_iso_packet_getset[] =
 {
     { "status", (getter)vdp_py_usb_iso_packet_get_status, (setter)vdp_py_usb_iso_packet_set_status, "status" },
+    { "actual_length", (getter)vdp_py_usb_iso_packet_get_actual_length, (setter)vdp_py_usb_iso_packet_set_actual_length, "actual_length" },
+    { "length", (getter)vdp_py_usb_iso_packet_get_length, NULL, "length" },
     { NULL }
 };
 
@@ -483,8 +575,8 @@ static PyTypeObject vdp_py_usb_iso_packettype =
     0, /* tp_str */
     0, /* tp_getattro */
     0, /* tp_setattro */
-    0, /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT, /* tp_flags */
+    &vdp_py_usb_iso_packet_as_buffer, /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_NEWBUFFER, /* tp_flags */
     "vdpusb ISOPacket", /* tp_doc */
     0, /* tp_traverse */
     0, /* tp_clear */
