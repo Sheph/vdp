@@ -249,6 +249,59 @@ static void vdp_py_usb_gadget_ep_dealloc(struct vdp_py_usb_gadget_ep* self)
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
+static void vdp_py_usb_gadget_ep_enable(struct vdp_usb_gadget_ep* ep, int value)
+{
+}
+
+static void vdp_py_usb_gadget_ep_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
+{
+
+}
+
+static void vdp_py_usb_gadget_ep_dequeue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
+{
+}
+
+static vdp_usb_urb_status vdp_py_usb_gadget_ep_clear_stall(struct vdp_usb_gadget_ep* ep)
+{
+    return vdp_usb_urb_status_completed;
+}
+
+static void vdp_py_usb_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep)
+{
+    struct vdp_py_usb_gadget_ep* self = ep->priv;
+
+    self->ep = NULL;
+}
+
+static struct vdp_usb_gadget_ep_ops vdp_py_usb_gadget_ep_ops =
+{
+    .enable = vdp_py_usb_gadget_ep_enable,
+    .enqueue = vdp_py_usb_gadget_ep_enqueue,
+    .dequeue = vdp_py_usb_gadget_ep_dequeue,
+    .clear_stall = vdp_py_usb_gadget_ep_clear_stall,
+    .destroy = vdp_py_usb_gadget_ep_destroy
+};
+
+static struct vdp_usb_gadget_ep* vdp_py_usb_gadget_ep_construct(struct vdp_py_usb_gadget_ep* self)
+{
+    struct vdp_usb_gadget_ep* ep;
+
+    if (self->ep) {
+        PyErr_SetString(PyExc_RuntimeError, "endpoint is already in use");
+        return NULL;
+    }
+
+    ep = vdp_usb_gadget_ep_create(&self->caps, &vdp_py_usb_gadget_ep_ops, self);
+
+    if (!ep) {
+        PyErr_SetString(PyExc_MemoryError, "cannot create endpoint");
+        return NULL;
+    }
+
+    return ep;
+}
+
 static PyTypeObject vdp_py_usb_gadget_eptype =
 {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -387,6 +440,72 @@ static void vdp_py_usb_gadget_interface_dealloc(struct vdp_py_usb_gadget_interfa
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
+static void vdp_py_usb_gadget_interface_enable(struct vdp_usb_gadget_interface* interface, int value)
+{
+}
+
+static void vdp_py_usb_gadget_interface_destroy(struct vdp_usb_gadget_interface* interface)
+{
+    struct vdp_py_usb_gadget_interface* self = interface->priv;
+
+    self->interface = NULL;
+}
+
+static struct vdp_usb_gadget_interface_ops vdp_py_usb_gadget_interface_ops =
+{
+    .enable = vdp_py_usb_gadget_interface_enable,
+    .destroy = vdp_py_usb_gadget_interface_destroy
+};
+
+static struct vdp_usb_gadget_interface* vdp_py_usb_gadget_interface_construct(struct vdp_py_usb_gadget_interface* self)
+{
+    struct vdp_usb_gadget_interface_caps caps;
+    Py_ssize_t cnt, i;
+    struct vdp_usb_gadget_interface* interface;
+
+    if (self->interface) {
+        PyErr_SetString(PyExc_RuntimeError, "interface is already in use");
+        return NULL;
+    }
+
+    memcpy(&caps, &self->caps, sizeof(caps));
+
+    cnt = PyList_Size(self->endpoint_list);
+
+    caps.endpoints = malloc(sizeof(caps.endpoints[0]) * (cnt + 1));
+
+    for (i = 0; i < cnt; ++i) {
+        struct vdp_py_usb_gadget_ep* ep =
+            vdp_py_usb_gadget_ep_check(PyList_GetItem(self->endpoint_list, i));
+
+        caps.endpoints[i] = vdp_py_usb_gadget_ep_construct(ep);
+        if (!caps.endpoints[i]) {
+            for (--i; i >= 0; --i) {
+                vdp_usb_gadget_ep_destroy(caps.endpoints[i]);
+            }
+            free(caps.endpoints);
+            return NULL;
+        }
+    }
+
+    caps.endpoints[i] = NULL;
+
+    interface = vdp_usb_gadget_interface_create(&caps, &vdp_py_usb_gadget_interface_ops, self);
+
+    if (!interface) {
+        PyErr_SetString(PyExc_MemoryError, "cannot create interface");
+        for (i = 0; i < cnt; ++i) {
+            vdp_usb_gadget_ep_destroy(caps.endpoints[i]);
+        }
+        free(caps.endpoints);
+        return NULL;
+    }
+
+    free(caps.endpoints);
+
+    return interface;
+}
+
 static PyTypeObject vdp_py_usb_gadget_interfacetype =
 {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -523,6 +642,72 @@ static void vdp_py_usb_gadget_config_dealloc(struct vdp_py_usb_gadget_config* se
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
+static void vdp_py_usb_gadget_config_enable(struct vdp_usb_gadget_config* config, int value)
+{
+}
+
+static void vdp_py_usb_gadget_config_destroy(struct vdp_usb_gadget_config* config)
+{
+    struct vdp_py_usb_gadget_config* self = config->priv;
+
+    self->config = NULL;
+}
+
+static struct vdp_usb_gadget_config_ops vdp_py_usb_gadget_config_ops =
+{
+    .enable = vdp_py_usb_gadget_config_enable,
+    .destroy = vdp_py_usb_gadget_config_destroy
+};
+
+static struct vdp_usb_gadget_config* vdp_py_usb_gadget_config_construct(struct vdp_py_usb_gadget_config* self)
+{
+    struct vdp_usb_gadget_config_caps caps;
+    Py_ssize_t cnt, i;
+    struct vdp_usb_gadget_config* config;
+
+    if (self->config) {
+        PyErr_SetString(PyExc_RuntimeError, "config is already in use");
+        return NULL;
+    }
+
+    memcpy(&caps, &self->caps, sizeof(caps));
+
+    cnt = PyList_Size(self->interface_list);
+
+    caps.interfaces = malloc(sizeof(caps.interfaces[0]) * (cnt + 1));
+
+    for (i = 0; i < cnt; ++i) {
+        struct vdp_py_usb_gadget_interface* interface =
+            vdp_py_usb_gadget_interface_check(PyList_GetItem(self->interface_list, i));
+
+        caps.interfaces[i] = vdp_py_usb_gadget_interface_construct(interface);
+        if (!caps.interfaces[i]) {
+            for (--i; i >= 0; --i) {
+                vdp_usb_gadget_interface_destroy(caps.interfaces[i]);
+            }
+            free(caps.interfaces);
+            return NULL;
+        }
+    }
+
+    caps.interfaces[i] = NULL;
+
+    config = vdp_usb_gadget_config_create(&caps, &vdp_py_usb_gadget_config_ops, self);
+
+    if (!config) {
+        PyErr_SetString(PyExc_MemoryError, "cannot create config");
+        for (i = 0; i < cnt; ++i) {
+            vdp_usb_gadget_interface_destroy(caps.interfaces[i]);
+        }
+        free(caps.interfaces);
+        return NULL;
+    }
+
+    free(caps.interfaces);
+
+    return config;
+}
+
 static PyTypeObject vdp_py_usb_gadget_configtype =
 {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -557,14 +742,256 @@ static PyTypeObject vdp_py_usb_gadget_configtype =
     0, /* tp_getset */
 };
 
-static PyMethodDef vdp_py_usb_gadget_methods[] =
+static struct vdp_py_usb_gadget_config* vdp_py_usb_gadget_config_check(PyObject* obj)
+{
+    if (!PyObject_IsInstance(obj, (PyObject*)&vdp_py_usb_gadget_configtype)) {
+        return NULL;
+    }
+    return (struct vdp_py_usb_gadget_config*)obj;
+}
+
+struct vdp_py_usb_gadget
+{
+    PyObject_HEAD
+
+    PyObject* fn_reset;
+    PyObject* fn_power;
+    PyObject* fn_set_address;
+    PyObject* fn_destroy;
+
+    PyObject* caps_obj;
+
+    struct vdp_usb_gadget* gadget;
+};
+
+static void vdp_py_usb_gadget_reset(struct vdp_usb_gadget* gadget, int start)
+{
+}
+
+static void vdp_py_usb_gadget_power(struct vdp_usb_gadget* gadget, int on)
+{
+}
+
+static void vdp_py_usb_gadget_set_address(struct vdp_usb_gadget* gadget, vdp_u32 address)
+{
+}
+
+static void vdp_py_usb_gadget_destroy(struct vdp_usb_gadget* gadget)
+{
+    struct vdp_py_usb_gadget* self = gadget->priv;
+
+    self->gadget = NULL;
+}
+
+static struct vdp_usb_gadget_ops vdp_py_usb_gadget_ops =
+{
+    .reset = vdp_py_usb_gadget_reset,
+    .power = vdp_py_usb_gadget_power,
+    .set_address = vdp_py_usb_gadget_set_address,
+    .destroy = vdp_py_usb_gadget_destroy
+};
+
+static int vdp_py_usb_gadget_init_obj(struct vdp_py_usb_gadget* self, PyObject* args, PyObject* kwargs)
+{
+    struct vdp_py_usb_gadget_ep* endpoint0;
+    struct vdp_usb_gadget_caps gadget_caps;
+    PyObject* caps;
+    PyObject* name_obj;
+    PyObject* configs_obj;
+    PyObject* endpoint0_obj;
+    int res = 1;
+    Py_ssize_t cnt = 0, i, j, k;
+
+    if (!PyArg_ParseTuple(args, "O", &caps)) {
+        return -1;
+    }
+
+    gadget_caps.bcd_usb = getint(caps, "bcd_usb", &res);
+    gadget_caps.bcd_device = getint(caps, "bcd_device", &res);
+    gadget_caps.klass = getint(caps, "klass", &res);
+    gadget_caps.subklass = getint(caps, "subklass", &res);
+    gadget_caps.protocol = getint(caps, "protocol", &res);
+    gadget_caps.vendor_id = getint(caps, "vendor_id", &res);
+    gadget_caps.product_id = getint(caps, "product_id", &res);
+    gadget_caps.manufacturer = getint(caps, "manufacturer", &res);
+    gadget_caps.product = getint(caps, "product", &res);
+    gadget_caps.serial_number = getint(caps, "serial_number", &res);
+
+    if (!res) {
+        return -1;
+    }
+
+    name_obj = PyString_FromString("configs");
+    configs_obj = PyObject_GetItem(caps, name_obj);
+    Py_DECREF(name_obj);
+    if (configs_obj && (configs_obj != Py_None)) {
+        if (!PyList_Check(configs_obj)) {
+            PyErr_Format(PyExc_TypeError, "value of '%s' is not a list", "configs");
+            Py_DECREF(configs_obj);
+            return -1;
+        }
+
+        cnt = PyList_Size(configs_obj);
+
+        for (i = 0; i < cnt; ++i) {
+            struct vdp_py_usb_gadget_config* config;
+
+            PyObject* config_obj = PyList_GetItem(configs_obj, i);
+
+            config = vdp_py_usb_gadget_config_check(config_obj);
+            if (!config) {
+                PyErr_Format(PyExc_TypeError, "value of '%s' elements are not configs", "configs");
+                Py_DECREF(configs_obj);
+                return -1;
+            }
+        }
+    }
+
+    gadget_caps.configs = malloc(sizeof(gadget_caps.configs[0]) * (cnt + 1));
+
+    for (i = 0; i < cnt; ++i) {
+        struct vdp_py_usb_gadget_config* config =
+            vdp_py_usb_gadget_config_check(PyList_GetItem(configs_obj, i));
+
+        gadget_caps.configs[i] = vdp_py_usb_gadget_config_construct(config);
+        if (!gadget_caps.configs[i]) {
+            Py_XDECREF(configs_obj);
+            for (--i; i >= 0; --i) {
+                vdp_usb_gadget_config_destroy(gadget_caps.configs[i]);
+            }
+            free(gadget_caps.configs);
+            return -1;
+        }
+    }
+
+    gadget_caps.configs[i] = NULL;
+
+    Py_XDECREF(configs_obj);
+
+    name_obj = PyString_FromString("endpoint0");
+    endpoint0_obj = PyObject_GetItem(caps, name_obj);
+    Py_DECREF(name_obj);
+    if (!endpoint0_obj) {
+        PyErr_Format(PyExc_AttributeError, "attribute '%s' not found", "endpoint0");
+        goto fail1;
+    }
+
+    endpoint0 = vdp_py_usb_gadget_ep_check(endpoint0_obj);
+    if (!endpoint0) {
+        PyErr_Format(PyExc_TypeError, "value of '%s' is not endpoint", "endpoint0");
+        goto fail1;
+    }
+
+    gadget_caps.endpoint0 = vdp_py_usb_gadget_ep_construct(endpoint0);
+    if (!gadget_caps.endpoint0) {
+        goto fail1;
+    }
+
+    gadget_caps.string_tables = NULL;
+
+    self->gadget = vdp_usb_gadget_create(&gadget_caps, &vdp_py_usb_gadget_ops, self);
+
+    if (!self->gadget) {
+        PyErr_SetString(PyExc_MemoryError, "cannot create gadget");
+        goto fail2;
+    }
+
+    free(gadget_caps.configs);
+
+    endpoint0->ep = self->gadget->caps.endpoint0;
+
+    for (i = 0; self->gadget->caps.configs && self->gadget->caps.configs[i]; ++i) {
+        struct vdp_usb_gadget_config* cfg = self->gadget->caps.configs[i];
+        ((struct vdp_py_usb_gadget_config*)cfg->priv)->config = cfg;
+        for (j = 0; cfg->caps.interfaces && cfg->caps.interfaces[j]; ++j) {
+            struct vdp_usb_gadget_interface* iface = cfg->caps.interfaces[j];
+            ((struct vdp_py_usb_gadget_interface*)iface->priv)->interface = iface;
+            for (k = 0; iface->caps.endpoints && iface->caps.endpoints[k]; ++k) {
+                ((struct vdp_py_usb_gadget_ep*)iface->caps.endpoints[k]->priv)->ep = iface->caps.endpoints[k];
+            }
+        }
+    }
+
+    self->fn_reset = PyObject_GetAttrString((PyObject*)self, "reset");
+    self->fn_power = PyObject_GetAttrString((PyObject*)self, "power");
+    self->fn_set_address = PyObject_GetAttrString((PyObject*)self, "set_address");
+    self->fn_destroy = PyObject_GetAttrString((PyObject*)self, "destroy");
+
+    PyErr_Clear();
+
+    Py_INCREF(caps);
+    self->caps_obj = caps;
+
+    return 0;
+
+fail2:
+    vdp_usb_gadget_ep_destroy(gadget_caps.endpoint0);
+fail1:
+    for (i = 0; i < cnt; ++i) {
+        vdp_usb_gadget_config_destroy(gadget_caps.configs[i]);
+    }
+    free(gadget_caps.configs);
+    return -1;
+}
+
+static void vdp_py_usb_gadget_dealloc(struct vdp_py_usb_gadget* self)
+{
+    if (self->gadget) {
+        vdp_usb_gadget_destroy(self->gadget);
+    }
+
+    Py_XDECREF(self->fn_reset);
+    Py_XDECREF(self->fn_power);
+    Py_XDECREF(self->fn_set_address);
+    Py_XDECREF(self->fn_destroy);
+
+    Py_XDECREF(self->caps_obj);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+static PyTypeObject vdp_py_usb_gadgettype =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "usb.gadget.Gadget", /* tp_name */
+    sizeof(struct vdp_py_usb_gadget), /* tp_basicsize */
+    0, /* tp_itemsize */
+    (destructor)vdp_py_usb_gadget_dealloc, /* tp_dealloc */
+    0, /* tp_print */
+    0, /* tp_getattr */
+    0, /* tp_setattr */
+    0, /* tp_reserved */
+    0, /* tp_repr */
+    0, /* tp_as_number */
+    0, /* tp_as_sequence */
+    0, /* tp_as_mapping */
+    0, /* tp_hash  */
+    0, /* tp_call */
+    0, /* tp_str */
+    0, /* tp_getattro */
+    0, /* tp_setattro */
+    0, /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+    "vdpusb gadget Gadget", /* tp_doc */
+    0, /* tp_traverse */
+    0, /* tp_clear */
+    0, /* tp_richcompare */
+    0, /* tp_weaklistoffset */
+    0, /* tp_iter */
+    0, /* tp_iternext */
+    0, /* tp_methods */
+    0, /* tp_members */
+    0, /* tp_getset */
+};
+
+static PyMethodDef vdp_py_usb_gadget_module_methods[] =
 {
     { NULL }
 };
 
 void vdp_py_usb_gadget_init(PyObject* module)
 {
-    PyObject* module2 = Py_InitModule3("usb.gadget", vdp_py_usb_gadget_methods, "vdpusb gadget module");
+    PyObject* module2 = Py_InitModule3("usb.gadget", vdp_py_usb_gadget_module_methods, "vdpusb gadget module");
 
     PyModule_AddIntConstant(module2, "EP_IN", vdp_usb_gadget_ep_in);
     PyModule_AddIntConstant(module2, "EP_OUT", vdp_usb_gadget_ep_out);
@@ -607,6 +1034,12 @@ void vdp_py_usb_gadget_init(PyObject* module)
         return;
     }
 
+    vdp_py_usb_gadgettype.tp_new = PyType_GenericNew;
+    vdp_py_usb_gadgettype.tp_init = (initproc)vdp_py_usb_gadget_init_obj;
+    if (PyType_Ready(&vdp_py_usb_gadgettype) < 0) {
+        return;
+    }
+
     Py_INCREF(&vdp_py_usb_gadget_eptype);
     PyModule_AddObject(module2, "Endpoint", (PyObject*)&vdp_py_usb_gadget_eptype);
 
@@ -615,6 +1048,9 @@ void vdp_py_usb_gadget_init(PyObject* module)
 
     Py_INCREF(&vdp_py_usb_gadget_configtype);
     PyModule_AddObject(module2, "Config", (PyObject*)&vdp_py_usb_gadget_configtype);
+
+    Py_INCREF(&vdp_py_usb_gadgettype);
+    PyModule_AddObject(module2, "Gadget", (PyObject*)&vdp_py_usb_gadgettype);
 
     Py_INCREF(module2);
     PyModule_AddObject(module, "gadget", module2);

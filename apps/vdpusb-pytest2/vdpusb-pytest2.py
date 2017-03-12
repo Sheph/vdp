@@ -82,7 +82,22 @@ class TestConfig(vdp.usb.gadget.Config):
             description = 0,
             interfaces = [TestInterface()]));
 
+class TestGadget(vdp.usb.gadget.Gadget):
+    def __init__(self):
+        vdp.usb.gadget.Gadget.__init__(self, dict(
+            bcd_usb = 0x0200,
+            bcd_device = 0x3000,
+            klass = 0,
+            subklass = 0,
+            protocol = 0,
+            vendor_id = 0x046d,
+            product_id = 0xc051,
+            manufacturer = 1,
+            product = 2,
+            serial_number = 0,
+            configs = [TestConfig()],
+            endpoint0 = TestEndpoint0()));
+
 if __name__ == "__main__":
-    ep0 = TestEndpoint0();
-    cfg = TestConfig();
+    gadget = TestGadget();
     print("Test");
