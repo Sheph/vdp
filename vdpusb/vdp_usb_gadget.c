@@ -30,6 +30,56 @@
 #include <stdlib.h>
 #include <string.h>
 
+int vdp_usb_gadget_ep_dir_validate(int value)
+{
+    switch (value) {
+    case vdp_usb_gadget_ep_in:
+    case vdp_usb_gadget_ep_out:
+    case vdp_usb_gadget_ep_inout:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+int vdp_usb_gadget_ep_type_validate(int value)
+{
+    switch (value) {
+    case vdp_usb_gadget_ep_control:
+    case vdp_usb_gadget_ep_iso:
+    case vdp_usb_gadget_ep_bulk:
+    case vdp_usb_gadget_ep_int:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+int vdp_usb_gadget_ep_sync_validate(int value)
+{
+    switch (value) {
+    case vdp_usb_gadget_ep_sync_none:
+    case vdp_usb_gadget_ep_sync_async:
+    case vdp_usb_gadget_ep_sync_adaptive:
+    case vdp_usb_gadget_ep_sync_sync:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+int vdp_usb_gadget_ep_usage_validate(int value)
+{
+    switch (value) {
+    case vdp_usb_gadget_ep_usage_data:
+    case vdp_usb_gadget_ep_usage_feedback:
+    case vdp_usb_gadget_ep_usage_implicit_fb:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 static int ptr_array_count(void** arr)
 {
     void** iter;

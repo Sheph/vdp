@@ -149,6 +149,8 @@ typedef enum
     vdp_usb_gadget_ep_inout = vdp_usb_gadget_ep_in | vdp_usb_gadget_ep_out
 } vdp_usb_gadget_ep_dir;
 
+int vdp_usb_gadget_ep_dir_validate(int value);
+
 typedef enum
 {
     vdp_usb_gadget_ep_control = VDP_USB_ENDPOINT_XFER_CONTROL,
@@ -156,6 +158,8 @@ typedef enum
     vdp_usb_gadget_ep_bulk = VDP_USB_ENDPOINT_XFER_BULK,
     vdp_usb_gadget_ep_int = VDP_USB_ENDPOINT_XFER_INT
 } vdp_usb_gadget_ep_type;
+
+int vdp_usb_gadget_ep_type_validate(int value);
 
 typedef enum
 {
@@ -165,12 +169,16 @@ typedef enum
     vdp_usb_gadget_ep_sync_sync = VDP_USB_ENDPOINT_SYNC_SYNC
 } vdp_usb_gadget_ep_sync;
 
+int vdp_usb_gadget_ep_sync_validate(int value);
+
 typedef enum
 {
     vdp_usb_gadget_ep_usage_data = VDP_USB_ENDPOINT_USAGE_DATA,
     vdp_usb_gadget_ep_usage_feedback = VDP_USB_ENDPOINT_USAGE_FEEDBACK,
     vdp_usb_gadget_ep_usage_implicit_fb = VDP_USB_ENDPOINT_USAGE_IMPLICIT_FB
 } vdp_usb_gadget_ep_usage;
+
+int vdp_usb_gadget_ep_usage_validate(int value);
 
 struct vdp_usb_gadget_ep_caps
 {
