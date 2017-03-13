@@ -18,7 +18,7 @@ whatever you want, easily.
 -------------------
 
 Just starting. Now it's only USB with C API on linux, but there're plans to
-also implement PCI, HMDI/VGA and other types of devices. Windows porting
+also implement PCI, HDMI/VGA and other types of devices. Windows porting
 and other languages (python, lua, etc.) support is also planned. There're also
 plans to make more sample apps (for now it's just a simple USB HID mouse), usbip-like
 sample will be one of them.
