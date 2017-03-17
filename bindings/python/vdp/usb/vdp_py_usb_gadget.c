@@ -122,6 +122,7 @@ static struct vdp_usb_descriptor_header** get_descriptors(PyObject* obj, const c
     Py_DECREF(name_obj);
     if (!value_obj || (value_obj == Py_None)) {
         PyErr_Clear();
+        Py_XDECREF(value_obj);
         return NULL;
     }
 
