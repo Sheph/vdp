@@ -37,7 +37,4 @@ struct vdp_py_usb_context
 
 void vdp_py_usb_context_init(PyObject* module);
 
-PyObject* vdp_py_usb_context_new(struct vdp_usb_context* ctx);
-struct vdp_py_usb_context* vdp_py_usb_context_check(PyObject* obj);
-
 #endif

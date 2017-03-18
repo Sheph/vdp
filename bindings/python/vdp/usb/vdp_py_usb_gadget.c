@@ -24,6 +24,8 @@
  */
 
 #include "vdp_py_usb_gadget.h"
+#include "vdp_py_usb_device.h"
+#include "vdp_py_usb_error.h"
 #include "vdp/usb_gadget.h"
 
 static int getint(PyObject* obj, const char* name, int* res)
@@ -379,11 +381,24 @@ static void vdp_py_usb_gadget_ep_dealloc(struct vdp_py_usb_gadget_ep* self)
 
 static void vdp_py_usb_gadget_ep_enable(struct vdp_usb_gadget_ep* ep, int value)
 {
+    struct vdp_py_usb_gadget_ep* self = ep->priv;
+    PyObject* ret;
+
+    if (!self->fn_enable) {
+        return;
+    }
+
+    ret = PyObject_CallFunction(self->fn_enable, "i", (int)value);
+
+    Py_XDECREF(ret);
+
+    if (!ret) {
+        PyErr_Clear();
+    }
 }
 
 static void vdp_py_usb_gadget_ep_enqueue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
 {
-
 }
 
 static void vdp_py_usb_gadget_ep_dequeue(struct vdp_usb_gadget_ep* ep, struct vdp_usb_gadget_request* request)
@@ -398,6 +413,16 @@ static vdp_usb_urb_status vdp_py_usb_gadget_ep_clear_stall(struct vdp_usb_gadget
 static void vdp_py_usb_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep)
 {
     struct vdp_py_usb_gadget_ep* self = ep->priv;
+
+    if (self->fn_destroy && self->ep) {
+        PyObject* ret = PyObject_CallFunction(self->fn_destroy, NULL);
+
+        Py_XDECREF(ret);
+
+        if (!ret) {
+            PyErr_Clear();
+        }
+    }
 
     self->ep = NULL;
 }
@@ -570,11 +595,35 @@ static void vdp_py_usb_gadget_interface_dealloc(struct vdp_py_usb_gadget_interfa
 
 static void vdp_py_usb_gadget_interface_enable(struct vdp_usb_gadget_interface* interface, int value)
 {
+    struct vdp_py_usb_gadget_interface* self = interface->priv;
+    PyObject* ret;
+
+    if (!self->fn_enable) {
+        return;
+    }
+
+    ret = PyObject_CallFunction(self->fn_enable, "i", (int)value);
+
+    Py_XDECREF(ret);
+
+    if (!ret) {
+        PyErr_Clear();
+    }
 }
 
 static void vdp_py_usb_gadget_interface_destroy(struct vdp_usb_gadget_interface* interface)
 {
     struct vdp_py_usb_gadget_interface* self = interface->priv;
+
+    if (self->fn_destroy && self->interface) {
+        PyObject* ret = PyObject_CallFunction(self->fn_destroy, NULL);
+
+        Py_XDECREF(ret);
+
+        if (!ret) {
+            PyErr_Clear();
+        }
+    }
 
     self->interface = NULL;
 }
@@ -772,11 +821,35 @@ static void vdp_py_usb_gadget_config_dealloc(struct vdp_py_usb_gadget_config* se
 
 static void vdp_py_usb_gadget_config_enable(struct vdp_usb_gadget_config* config, int value)
 {
+    struct vdp_py_usb_gadget_config* self = config->priv;
+    PyObject* ret;
+
+    if (!self->fn_enable) {
+        return;
+    }
+
+    ret = PyObject_CallFunction(self->fn_enable, "i", (int)value);
+
+    Py_XDECREF(ret);
+
+    if (!ret) {
+        PyErr_Clear();
+    }
 }
 
 static void vdp_py_usb_gadget_config_destroy(struct vdp_usb_gadget_config* config)
 {
     struct vdp_py_usb_gadget_config* self = config->priv;
+
+    if (self->fn_destroy && self->config) {
+        PyObject* ret = PyObject_CallFunction(self->fn_destroy, NULL);
+
+        Py_XDECREF(ret);
+
+        if (!ret) {
+            PyErr_Clear();
+        }
+    }
 
     self->config = NULL;
 }
@@ -907,6 +980,16 @@ static void vdp_py_usb_gadget_set_address(struct vdp_usb_gadget* gadget, vdp_u32
 static void vdp_py_usb_gadget_destroy(struct vdp_usb_gadget* gadget)
 {
     struct vdp_py_usb_gadget* self = gadget->priv;
+
+    if (self->fn_destroy) {
+        PyObject* ret = PyObject_CallFunction(self->fn_destroy, NULL);
+
+        Py_XDECREF(ret);
+
+        if (!ret) {
+            PyErr_Clear();
+        }
+    }
 
     self->gadget = NULL;
 }
@@ -1081,6 +1164,42 @@ static void vdp_py_usb_gadget_dealloc(struct vdp_py_usb_gadget* self)
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
+static PyObject* vdp_py_usb_gadget_event(struct vdp_py_usb_gadget* self, PyObject* args)
+{
+    PyObject* device_obj = NULL;
+    struct vdp_py_usb_device* py_device = NULL;
+    struct vdp_usb_event event;
+    vdp_usb_result res;
+
+    if (!PyArg_ParseTuple(args, "O", &device_obj)) {
+        return NULL;
+    }
+
+    py_device = vdp_py_usb_device_check(device_obj);
+    if (!py_device) {
+        PyErr_SetString(PyExc_TypeError, "device object is expected");
+        return NULL;
+    }
+
+    res = vdp_usb_device_get_event(py_device->device, &event);
+
+    if (res != vdp_usb_success) {
+        vdp_py_usb_error_set(res);
+        return NULL;
+    }
+
+    vdp_usb_gadget_event(self->gadget, &event);
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyMethodDef vdp_py_usb_gadget_methods[] =
+{
+    { "event", (PyCFunction)vdp_py_usb_gadget_event, METH_VARARGS, "Process gadget event" },
+    { NULL }
+};
+
 static PyTypeObject vdp_py_usb_gadgettype =
 {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -1110,7 +1229,7 @@ static PyTypeObject vdp_py_usb_gadgettype =
     0, /* tp_weaklistoffset */
     0, /* tp_iter */
     0, /* tp_iternext */
-    0, /* tp_methods */
+    vdp_py_usb_gadget_methods, /* tp_methods */
     0, /* tp_members */
     0, /* tp_getset */
 };

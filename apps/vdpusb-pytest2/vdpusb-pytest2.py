@@ -1,5 +1,6 @@
 import vdp;
 import vdp.usb;
+import select;
 import struct;
 
 test_report_descriptor = bytearray([
@@ -52,6 +53,12 @@ class TestEndpoint0(vdp.usb.gadget.Endpoint):
             max_packet_size = 64,
             interval = 0));
 
+    def enable(self, value):
+        print("ep0 enable = %d" % value);
+
+    def destroy(self):
+        print("ep0 destroy");
+
 class TestEndpoint1(vdp.usb.gadget.Endpoint):
     def __init__(self):
         vdp.usb.gadget.Endpoint.__init__(self, dict(
@@ -60,6 +67,12 @@ class TestEndpoint1(vdp.usb.gadget.Endpoint):
             type = vdp.usb.gadget.EP_INT,
             max_packet_size = 8,
             interval = 7));
+
+    def enable(self, value):
+        print("ep1 enable = %d" % value);
+
+    def destroy(self):
+        print("ep1 destroy");
 
 class TestInterface(vdp.usb.gadget.Interface):
     def __init__(self):
@@ -73,6 +86,12 @@ class TestInterface(vdp.usb.gadget.Interface):
             descriptors = [(vdp.usb.HID_DT_HID, struct.pack("<HBBBH", 0x0110, 0, 1, vdp.usb.HID_DT_REPORT, len(test_report_descriptor)))],
             endpoints = [TestEndpoint1()]));
 
+    def enable(self, value):
+        print("iface enable = %d" % value);
+
+    def destroy(self):
+        print("iface destroy");
+
 class TestConfig(vdp.usb.gadget.Config):
     def __init__(self):
         vdp.usb.gadget.Config.__init__(self, dict(
@@ -81,6 +100,12 @@ class TestConfig(vdp.usb.gadget.Config):
             max_power = 49,
             description = 0,
             interfaces = [TestInterface()]));
+
+    def enable(self, value):
+        print("config enable = %d" % value);
+
+    def destroy(self):
+        print("config destroy");
 
 class TestGadget(vdp.usb.gadget.Gadget):
     def __init__(self):
@@ -99,6 +124,27 @@ class TestGadget(vdp.usb.gadget.Gadget):
             configs = [TestConfig()],
             endpoint0 = TestEndpoint0()));
 
+    def destroy(self):
+        print("gadget destroy");
+
 if __name__ == "__main__":
-    gadget = TestGadget();
-    print("Test");
+    ctx = vdp.usb.Context();
+    try:
+        gadget = TestGadget();
+
+        print("Device range: (%d, %d)" % ctx.get_device_range());
+        device = ctx.open_device(0);
+        device.attach(vdp.usb.SPEED_HIGH);
+        fd = device.get_fd();
+
+        try:
+            while True:
+                rd, wr, er = select.select([fd], [], [])
+                if rd:
+                    gadget.event(device);
+        except KeyboardInterrupt:
+            pass
+
+        device.detach();
+    except Exception, e:
+        print("Error: %s" % e);

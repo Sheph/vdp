@@ -133,13 +133,3 @@ void vdp_py_usb_context_init(PyObject* module)
     Py_INCREF(&vdp_py_usb_contexttype);
     PyModule_AddObject(module, "Context", (PyObject*)&vdp_py_usb_contexttype);
 }
-
-PyObject* vdp_py_usb_context_new(struct vdp_usb_context* ctx)
-{
-    return NULL;
-}
-
-struct vdp_py_usb_context* vdp_py_usb_context_check(PyObject* obj)
-{
-    return NULL;
-}

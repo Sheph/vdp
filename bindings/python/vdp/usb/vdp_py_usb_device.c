@@ -165,5 +165,8 @@ PyObject* vdp_py_usb_device_new(PyObject* ctx, struct vdp_usb_device* device)
 
 struct vdp_py_usb_device* vdp_py_usb_device_check(PyObject* obj)
 {
-    return NULL;
+    if (!PyObject_IsInstance(obj, (PyObject*)&vdp_py_usb_devicetype)) {
+        return NULL;
+    }
+    return (struct vdp_py_usb_device*)obj;
 }
