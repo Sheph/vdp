@@ -79,12 +79,7 @@ static vdp_usb_urb_status vdp_py_usb_filter_get_device_descriptor(void* user_dat
     PyObject* ret;
     int res = 1;
 
-    if (!self->fn_get_device_descriptor) {
-        PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_device_descriptor");
-        return vdp_usb_urb_status_stall;
-    }
-
-    ret = PyObject_CallFunction(self->fn_get_device_descriptor, NULL);
+    ret = PyObject_CallMethod((PyObject*)self, "get_device_descriptor", NULL);
 
     if (!ret) {
         return vdp_usb_urb_status_stall;
@@ -121,12 +116,7 @@ static vdp_usb_urb_status vdp_py_usb_filter_get_qualifier_descriptor(void* user_
     PyObject* ret;
     int res = 1;
 
-    if (!self->fn_get_qualifier_descriptor) {
-        PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_qualifier_descriptor");
-        return vdp_usb_urb_status_stall;
-    }
-
-    ret = PyObject_CallFunction(self->fn_get_qualifier_descriptor, NULL);
+    ret = PyObject_CallMethod((PyObject*)self, "get_qualifier_descriptor", NULL);
 
     if (!ret) {
         return vdp_usb_urb_status_stall;
@@ -162,12 +152,7 @@ static vdp_usb_urb_status vdp_py_usb_filter_get_config_descriptor(void* user_dat
     PyObject* ret_other = NULL;
     int res = 1;
 
-    if (!self->fn_get_config_descriptor) {
-        PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_config_descriptor");
-        return vdp_usb_urb_status_stall;
-    }
-
-    ret = PyObject_CallFunction(self->fn_get_config_descriptor, "i", (int)index);
+    ret = PyObject_CallMethod((PyObject*)self, "get_config_descriptor", "i", (int)index);
 
     if (!ret) {
         return vdp_usb_urb_status_stall;
@@ -259,12 +244,7 @@ static vdp_usb_urb_status vdp_py_usb_filter_get_string_descriptor(void* user_dat
     PyObject* ret;
     Py_ssize_t cnt, i, j;
 
-    if (!self->fn_get_string_descriptor) {
-        PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_string_descriptor");
-        return vdp_usb_urb_status_stall;
-    }
-
-    ret = PyObject_CallFunction(self->fn_get_string_descriptor, NULL);
+    ret = PyObject_CallMethod((PyObject*)self, "get_string_descriptor", NULL);
 
     if (!ret) {
         return vdp_usb_urb_status_stall;
@@ -380,12 +360,7 @@ static vdp_usb_urb_status vdp_py_usb_filter_set_address(void* user_data,
     struct vdp_py_usb_filter* self = user_data;
     PyObject* ret;
 
-    if (!self->fn_set_address) {
-        PyErr_Format(PyExc_AttributeError, "'%s' not found", "set_address");
-        return vdp_usb_urb_status_stall;
-    }
-
-    ret = PyObject_CallFunction(self->fn_set_address, "i", (int)address);
+    ret = PyObject_CallMethod((PyObject*)self, "set_address", "i", (int)address);
 
     if (!ret) {
         return vdp_usb_urb_status_stall;
@@ -406,12 +381,7 @@ static vdp_usb_urb_status vdp_py_usb_filter_set_configuration(void* user_data,
     struct vdp_py_usb_filter* self = user_data;
     PyObject* ret;
 
-    if (!self->fn_set_configuration) {
-        PyErr_Format(PyExc_AttributeError, "'%s' not found", "set_configuration");
-        return vdp_usb_urb_status_stall;
-    }
-
-    ret = PyObject_CallFunction(self->fn_set_configuration, "i", (int)configuration);
+    ret = PyObject_CallMethod((PyObject*)self, "set_configuration", "i", (int)configuration);
 
     if (!ret) {
         return vdp_usb_urb_status_stall;
@@ -433,12 +403,7 @@ static vdp_usb_urb_status vdp_py_usb_filter_get_status(void* user_data,
     PyObject* ret;
     int ret_urb_status, ret_status = 0;
 
-    if (!self->fn_get_status) {
-        PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_status");
-        return vdp_usb_urb_status_stall;
-    }
-
-    ret = PyObject_CallFunction(self->fn_get_status, "ii", (int)recipient, (int)index);
+    ret = PyObject_CallMethod((PyObject*)self, "get_status", "ii", (int)recipient, (int)index);
 
     if (!ret) {
         return vdp_usb_urb_status_stall;
@@ -478,12 +443,7 @@ static vdp_usb_urb_status vdp_py_usb_filter_enable_feature(void* user_data,
     struct vdp_py_usb_filter* self = user_data;
     PyObject* ret;
 
-    if (!self->fn_enable_feature) {
-        PyErr_Format(PyExc_AttributeError, "'%s' not found", "enable_feature");
-        return vdp_usb_urb_status_stall;
-    }
-
-    ret = PyObject_CallFunction(self->fn_enable_feature, "iiii", (int)recipient, (int)index, (int)feature, (int)enable);
+    ret = PyObject_CallMethod((PyObject*)self, "enable_feature", "iiii", (int)recipient, (int)index, (int)feature, (int)enable);
 
     if (!ret) {
         return vdp_usb_urb_status_stall;
@@ -505,12 +465,7 @@ static vdp_usb_urb_status vdp_py_usb_filter_get_interface(void* user_data,
     PyObject* ret;
     int ret_urb_status, ret_alt_setting = 0;
 
-    if (!self->fn_get_interface) {
-        PyErr_Format(PyExc_AttributeError, "'%s' not found", "get_interface");
-        return vdp_usb_urb_status_stall;
-    }
-
-    ret = PyObject_CallFunction(self->fn_get_interface, "i", (int)interface);
+    ret = PyObject_CallMethod((PyObject*)self, "get_interface", "i", (int)interface);
 
     if (!ret) {
         return vdp_usb_urb_status_stall;
@@ -550,12 +505,7 @@ static vdp_usb_urb_status vdp_py_usb_filter_set_interface(void* user_data,
     struct vdp_py_usb_filter* self = user_data;
     PyObject* ret;
 
-    if (!self->fn_set_interface) {
-        PyErr_Format(PyExc_AttributeError, "'%s' not found", "set_interface");
-        return vdp_usb_urb_status_stall;
-    }
-
-    ret = PyObject_CallFunction(self->fn_set_interface, "ii", (int)interface, (int)alt_setting);
+    ret = PyObject_CallMethod((PyObject*)self, "set_interface", "ii", (int)interface, (int)alt_setting);
 
     if (!ret) {
         return vdp_usb_urb_status_stall;
@@ -577,12 +527,7 @@ static vdp_usb_urb_status vdp_py_usb_filter_set_descriptor(void* user_data,
     struct vdp_py_usb_filter* self = user_data;
     PyObject* ret;
 
-    if (!self->fn_set_descriptor) {
-        PyErr_Format(PyExc_AttributeError, "'%s' not found", "set_descriptor");
-        return vdp_usb_urb_status_stall;
-    }
-
-    ret = PyObject_CallFunction(self->fn_set_descriptor, "iis#", (int)value, (int)index, data, (int)len);
+    ret = PyObject_CallMethod((PyObject*)self, "set_descriptor", "iis#", (int)value, (int)index, data, (int)len);
 
     if (!ret) {
         return vdp_usb_urb_status_stall;
@@ -614,38 +559,12 @@ static struct vdp_usb_filter_ops vdp_py_usb_filter_ops =
 
 static int vdp_py_usb_filter_init_obj(struct vdp_py_usb_filter* self, PyObject* args, PyObject* kwargs)
 {
-    self->fn_get_device_descriptor = PyObject_GetAttrString((PyObject*)self, "get_device_descriptor");
-    self->fn_get_qualifier_descriptor = PyObject_GetAttrString((PyObject*)self, "get_qualifier_descriptor");
-    self->fn_get_config_descriptor = PyObject_GetAttrString((PyObject*)self, "get_config_descriptor");
-    self->fn_get_string_descriptor = PyObject_GetAttrString((PyObject*)self, "get_string_descriptor");
-    self->fn_set_address = PyObject_GetAttrString((PyObject*)self, "set_address");
-    self->fn_set_configuration = PyObject_GetAttrString((PyObject*)self, "set_configuration");
-    self->fn_get_status = PyObject_GetAttrString((PyObject*)self, "get_status");
-    self->fn_enable_feature = PyObject_GetAttrString((PyObject*)self, "enable_feature");
-    self->fn_get_interface = PyObject_GetAttrString((PyObject*)self, "get_interface");
-    self->fn_set_interface = PyObject_GetAttrString((PyObject*)self, "set_interface");
-    self->fn_set_descriptor = PyObject_GetAttrString((PyObject*)self, "set_descriptor");
-
-    PyErr_Clear();
-
     return 0;
 }
 
 static void vdp_py_usb_filter_dealloc(struct vdp_py_usb_filter* self)
 {
     int i, j;
-
-    Py_XDECREF(self->fn_get_device_descriptor);
-    Py_XDECREF(self->fn_get_qualifier_descriptor);
-    Py_XDECREF(self->fn_get_config_descriptor);
-    Py_XDECREF(self->fn_get_string_descriptor);
-    Py_XDECREF(self->fn_set_address);
-    Py_XDECREF(self->fn_set_configuration);
-    Py_XDECREF(self->fn_get_status);
-    Py_XDECREF(self->fn_enable_feature);
-    Py_XDECREF(self->fn_get_interface);
-    Py_XDECREF(self->fn_set_interface);
-    Py_XDECREF(self->fn_set_descriptor);
 
     for (i = 0; self->descriptors && self->descriptors[i]; ++i) {
         free(self->descriptors[i]);

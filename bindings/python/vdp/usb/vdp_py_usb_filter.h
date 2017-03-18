@@ -32,17 +32,6 @@
 struct vdp_py_usb_filter
 {
     PyObject_HEAD
-    PyObject* fn_get_device_descriptor;
-    PyObject* fn_get_qualifier_descriptor;
-    PyObject* fn_get_config_descriptor;
-    PyObject* fn_get_string_descriptor;
-    PyObject* fn_set_address;
-    PyObject* fn_set_configuration;
-    PyObject* fn_get_status;
-    PyObject* fn_enable_feature;
-    PyObject* fn_get_interface;
-    PyObject* fn_set_interface;
-    PyObject* fn_set_descriptor;
 
     struct vdp_usb_descriptor_header** descriptors;
     struct vdp_usb_string_table* string_tables;

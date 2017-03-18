@@ -126,12 +126,12 @@ class TestGadget(vdp.usb.gadget.Gadget):
 
     def destroy(self):
         print("gadget destroy");
+        vdp.usb.gadget.Gadget.destroy(self);
 
 if __name__ == "__main__":
     ctx = vdp.usb.Context();
+    gadget = TestGadget();
     try:
-        gadget = TestGadget();
-
         print("Device range: (%d, %d)" % ctx.get_device_range());
         device = ctx.open_device(0);
         device.attach(vdp.usb.SPEED_HIGH);
@@ -148,3 +148,4 @@ if __name__ == "__main__":
         device.detach();
     except Exception, e:
         print("Error: %s" % e);
+    gadget.destroy();
