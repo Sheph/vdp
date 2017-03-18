@@ -95,6 +95,7 @@ class TestGadget(vdp.usb.gadget.Gadget):
             manufacturer = 1,
             product = 2,
             serial_number = 0,
+            string_tables = [(0x0409, [(1, "Logitech"), (2, "USB-PS/2 Optical Mouse")])],
             configs = [TestConfig()],
             endpoint0 = TestEndpoint0()));
 

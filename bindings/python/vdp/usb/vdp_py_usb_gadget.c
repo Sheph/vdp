@@ -180,6 +180,133 @@ error:
     return NULL;
 }
 
+static void free_string_tables(struct vdp_usb_string_table* string_tables)
+{
+    int i, j;
+
+    for (i = 0; string_tables && string_tables[i].strings != NULL; ++i) {
+        const struct vdp_usb_string* strings = string_tables[i].strings;
+        for (j = 0; strings[j].str != NULL; ++j) {
+            free((void*)strings[j].str);
+        }
+        free((void*)strings);
+    }
+    free(string_tables);
+}
+
+static struct vdp_usb_string_table* get_string_tables(PyObject* obj, const char* name, int* res)
+{
+    struct vdp_usb_string_table* string_tables = NULL;
+    Py_ssize_t cnt, i, j;
+    PyObject* name_obj;
+    PyObject* value_obj;
+
+    if (!*res) {
+        return NULL;
+    }
+
+    name_obj = PyString_FromString(name);
+    value_obj = PyObject_GetItem(obj, name_obj);
+    Py_DECREF(name_obj);
+    if (!value_obj || (value_obj == Py_None)) {
+        PyErr_Clear();
+        Py_XDECREF(value_obj);
+        return NULL;
+    }
+
+    if (!PyList_Check(value_obj)) {
+        PyErr_Format(PyExc_TypeError, "value of '%s' is not a list", name);
+        goto error;
+    }
+
+    cnt = PyList_Size(value_obj);
+
+    if (cnt < 1) {
+        Py_DECREF(value_obj);
+        return NULL;
+    }
+
+    string_tables = malloc(sizeof(string_tables[0]) * (cnt + 1));
+
+    for (i = 0; i < cnt; ++i) {
+        PyObject* table;
+        int language_id = 0;
+        PyObject* strings = NULL;
+        Py_ssize_t strings_cnt;
+        struct vdp_usb_string* tmp;
+
+        string_tables[i].language_id = 0;
+        string_tables[i].strings = NULL;
+
+        table = PyList_GetItem(value_obj, i);
+
+        if (!PyTuple_Check(table)) {
+            PyErr_Format(PyExc_TypeError, "value of '%s' elements are not tuples", name);
+            goto error;
+        }
+
+        if (!PyArg_ParseTuple(table, "iO", &language_id, &strings)) {
+            goto error;
+        }
+
+        if (!PyList_Check(strings)) {
+            PyErr_Format(PyExc_TypeError, "value of '%s' elements are not tuples of language id and strings", name);
+            goto error;
+        }
+
+        strings_cnt = PyList_Size(strings);
+
+        string_tables[i].language_id = language_id;
+        string_tables[i].strings = malloc(sizeof(string_tables[i].strings[0]) * (strings_cnt + 1));
+
+        string_tables[i + 1].language_id = 0;
+        string_tables[i + 1].strings = NULL;
+
+        for (j = 0; j < strings_cnt; ++j) {
+            PyObject* str_obj;
+            int index = 0;
+            const char* str;
+            tmp = (struct vdp_usb_string*)&string_tables[i].strings[j];
+
+            tmp->index = 0;
+            tmp->str = NULL;
+
+            str_obj = PyList_GetItem(strings, j);
+
+            if (!PyTuple_Check(str_obj)) {
+                PyErr_Format(PyExc_TypeError, "value of '%s' strings elements are not tuples", name);
+                goto error;
+            }
+
+            if (!PyArg_ParseTuple(str_obj, "is", &index, &str)) {
+                goto error;
+            }
+
+            tmp->index = index;
+            tmp->str = strdup(str);
+        }
+
+        tmp = (struct vdp_usb_string*)&string_tables[i].strings[j];
+
+        tmp->index = 0;
+        tmp->str = NULL;
+    }
+
+    string_tables[i].language_id = 0;
+    string_tables[i].strings = NULL;
+
+    Py_DECREF(value_obj);
+
+    return string_tables;
+
+error:
+    free_string_tables(string_tables);
+    Py_DECREF(value_obj);
+    *res = 0;
+
+    return NULL;
+}
+
 struct vdp_py_usb_gadget_ep
 {
     PyObject_HEAD
@@ -817,6 +944,7 @@ static int vdp_py_usb_gadget_init_obj(struct vdp_py_usb_gadget* self, PyObject* 
     gadget_caps.manufacturer = getint(caps, "manufacturer", &res);
     gadget_caps.product = getint(caps, "product", &res);
     gadget_caps.serial_number = getint(caps, "serial_number", &res);
+    gadget_caps.string_tables = get_string_tables(caps, "string_tables", &res);
 
     if (!res) {
         return -1;
@@ -829,7 +957,7 @@ static int vdp_py_usb_gadget_init_obj(struct vdp_py_usb_gadget* self, PyObject* 
         if (!PyList_Check(configs_obj)) {
             PyErr_Format(PyExc_TypeError, "value of '%s' is not a list", "configs");
             Py_DECREF(configs_obj);
-            return -1;
+            goto fail0;
         }
 
         cnt = PyList_Size(configs_obj);
@@ -843,7 +971,7 @@ static int vdp_py_usb_gadget_init_obj(struct vdp_py_usb_gadget* self, PyObject* 
             if (!config) {
                 PyErr_Format(PyExc_TypeError, "value of '%s' elements are not configs", "configs");
                 Py_DECREF(configs_obj);
-                return -1;
+                goto fail0;
             }
         }
     }
@@ -861,7 +989,7 @@ static int vdp_py_usb_gadget_init_obj(struct vdp_py_usb_gadget* self, PyObject* 
                 vdp_usb_gadget_config_destroy(gadget_caps.configs[i]);
             }
             free(gadget_caps.configs);
-            return -1;
+            goto fail0;
         }
     }
 
@@ -888,8 +1016,6 @@ static int vdp_py_usb_gadget_init_obj(struct vdp_py_usb_gadget* self, PyObject* 
         goto fail1;
     }
 
-    gadget_caps.string_tables = NULL;
-
     self->gadget = vdp_usb_gadget_create(&gadget_caps, &vdp_py_usb_gadget_ops, self);
 
     if (!self->gadget) {
@@ -898,6 +1024,7 @@ static int vdp_py_usb_gadget_init_obj(struct vdp_py_usb_gadget* self, PyObject* 
     }
 
     free(gadget_caps.configs);
+    free_string_tables(gadget_caps.string_tables);
 
     endpoint0->ep = self->gadget->caps.endpoint0;
 
@@ -932,6 +1059,9 @@ fail1:
         vdp_usb_gadget_config_destroy(gadget_caps.configs[i]);
     }
     free(gadget_caps.configs);
+fail0:
+    free_string_tables(gadget_caps.string_tables);
+
     return -1;
 }
 

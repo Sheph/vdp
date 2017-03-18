@@ -328,6 +328,9 @@ static vdp_usb_urb_status vdp_py_usb_filter_get_string_descriptor(void* user_dat
             self->string_tables[i].language_id = language_id;
             self->string_tables[i].strings = malloc(sizeof(self->string_tables[i].strings[0]) * (strings_cnt + 1));
 
+            self->string_tables[i + 1].language_id = 0;
+            self->string_tables[i + 1].strings = NULL;
+
             for (j = 0; j < strings_cnt; ++j) {
                 PyObject* str_obj;
                 int index = 0;
