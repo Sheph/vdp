@@ -898,7 +898,23 @@ static void vdp_py_usb_gadget_ep_dequeue(struct vdp_usb_gadget_ep* ep, struct vd
 
 static vdp_usb_urb_status vdp_py_usb_gadget_ep_clear_stall(struct vdp_usb_gadget_ep* ep)
 {
-    return vdp_usb_urb_status_completed;
+    int status;
+    struct vdp_py_usb_gadget_ep* self = ep->priv;
+    PyObject* ret = PyObject_CallMethod((PyObject*)self, "clear_stall", NULL);
+
+    if (!ret || !PyInt_Check(ret)) {
+        PyErr_Clear();
+        return vdp_usb_urb_status_stall;
+    }
+
+    status = PyInt_AsLong(ret);
+    Py_DECREF(ret);
+
+    if (!vdp_usb_urb_status_validate(status)) {
+        return vdp_usb_urb_status_stall;
+    }
+
+    return status;
 }
 
 static void vdp_py_usb_gadget_ep_destroy(struct vdp_usb_gadget_ep* ep)
@@ -1434,14 +1450,53 @@ struct vdp_py_usb_gadget
 
 static void vdp_py_usb_gadget_reset(struct vdp_usb_gadget* gadget, int start)
 {
+    PyObject* ret;
+    struct vdp_py_usb_gadget_wrapper* gadget_wrapper =
+        (struct vdp_py_usb_gadget_wrapper*)gadget->priv;
+
+    assert(gadget_wrapper->gadget_obj);
+
+    ret = PyObject_CallMethod(gadget_wrapper->gadget_obj, "reset", "i", start);
+
+    Py_XDECREF(ret);
+
+    if (!ret) {
+        PyErr_Clear();
+    }
 }
 
 static void vdp_py_usb_gadget_power(struct vdp_usb_gadget* gadget, int on)
 {
+    PyObject* ret;
+    struct vdp_py_usb_gadget_wrapper* gadget_wrapper =
+        (struct vdp_py_usb_gadget_wrapper*)gadget->priv;
+
+    assert(gadget_wrapper->gadget_obj);
+
+    ret = PyObject_CallMethod(gadget_wrapper->gadget_obj, "power", "i", on);
+
+    Py_XDECREF(ret);
+
+    if (!ret) {
+        PyErr_Clear();
+    }
 }
 
 static void vdp_py_usb_gadget_set_address(struct vdp_usb_gadget* gadget, vdp_u32 address)
 {
+    PyObject* ret;
+    struct vdp_py_usb_gadget_wrapper* gadget_wrapper =
+        (struct vdp_py_usb_gadget_wrapper*)gadget->priv;
+
+    assert(gadget_wrapper->gadget_obj);
+
+    ret = PyObject_CallMethod(gadget_wrapper->gadget_obj, "set_address", "i", address);
+
+    Py_XDECREF(ret);
+
+    if (!ret) {
+        PyErr_Clear();
+    }
 }
 
 static void vdp_py_usb_gadget_destroy(struct vdp_usb_gadget* gadget)

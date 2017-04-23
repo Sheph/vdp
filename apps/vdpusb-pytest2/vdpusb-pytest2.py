@@ -82,6 +82,9 @@ class TestEndpoint0(vdp.usb.gadget.Endpoint):
     def dequeue(self, request):
         print("ep0 dequeue = %d" % request.id);
 
+    def clear_stall(self):
+        print("ep0 clear_stall");
+
 class TestEndpoint1(vdp.usb.gadget.Endpoint):
     def __init__(self):
         vdp.usb.gadget.Endpoint.__init__(self, dict(
@@ -114,6 +117,10 @@ class TestEndpoint1(vdp.usb.gadget.Endpoint):
 
     def dequeue(self, request):
         print("ep1 dequeue = %d" % request.id);
+
+    def clear_stall(self):
+        print("ep1 clear_stall");
+        return vdp.usb.URB_STATUS_COMPLETED;
 
 class TestInterface(vdp.usb.gadget.Interface):
     def __init__(self):
@@ -158,6 +165,15 @@ class TestGadget(vdp.usb.gadget.Gadget):
             string_tables = [(0x0409, [(1, "Logitech"), (2, "USB-PS/2 Optical Mouse")])],
             configs = [TestConfig()],
             endpoint0 = TestEndpoint0()));
+
+    def reset(self, start):
+        print("gadget reset = %d" % start);
+
+    def power(self, on):
+        print("gadget power = %d" % on);
+
+    def set_address(self, address):
+        print("gadget set_address = %d" % address);
 
 exiting = False;
 
