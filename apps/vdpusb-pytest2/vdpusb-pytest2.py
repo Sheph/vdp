@@ -2,6 +2,8 @@ import vdp;
 import vdp.usb;
 import select;
 import struct;
+import time;
+import signal;
 
 test_report_descriptor = bytearray([
     0x05, 0x01,     # Usage Page (Generic Desktop Ctrls)
@@ -56,8 +58,29 @@ class TestEndpoint0(vdp.usb.gadget.Endpoint):
     def enable(self, value):
         print("ep0 enable = %d" % value);
 
-    def destroy(self):
-        print("ep0 destroy");
+    def enqueue(self, request):
+        request.status = vdp.usb.URB_STATUS_STALL;
+
+        if request.setup_packet.request == vdp.usb.REQUEST_GET_DESCRIPTOR:
+            if (request.setup_packet.type == vdp.usb.gadget.REQUEST_STANDARD) and \
+            (request.setup_packet.recipient == vdp.usb.gadget.REQUEST_INTERFACE) and request.is_in:
+                dt_type = request.setup_packet.value >> 8;
+                if dt_type == vdp.usb.HID_DT_REPORT:
+                    print("get_hid_report_descriptor()");
+                    data = memoryview(request);
+                    request.status = vdp.usb.URB_STATUS_COMPLETED;
+                    request.actual_length = min(len(data), len(test_report_descriptor));
+                    data[0:request.actual_length] = test_report_descriptor[0:request.actual_length];
+        elif request.setup_packet.request == vdp.usb.HID_REQUEST_SET_IDLE:
+            if (request.setup_packet.type == vdp.usb.gadget.REQUEST_CLASS) and \
+            (request.setup_packet.recipient == vdp.usb.gadget.REQUEST_INTERFACE) and not request.is_in:
+                print("set_idle()");
+                request.status = vdp.usb.URB_STATUS_COMPLETED;
+
+        request.complete();
+
+    def dequeue(self, request):
+        print("ep0 dequeue = %d" % request.id);
 
 class TestEndpoint1(vdp.usb.gadget.Endpoint):
     def __init__(self):
@@ -71,8 +94,26 @@ class TestEndpoint1(vdp.usb.gadget.Endpoint):
     def enable(self, value):
         print("ep1 enable = %d" % value);
 
-    def destroy(self):
-        print("ep1 destroy");
+    def enqueue(self, request):
+        print("ep1 enqueue = %d" % request.id);
+        time.sleep(float(request.interval_us) / 1000000);
+        data = memoryview(request);
+
+        if len(data) >= 8:
+            data[0:8] = bytearray([
+                0, 0, 0, 0,
+                # X:
+                0, 0,
+                # Y:
+                0, 0]);
+
+            request.actual_length = 8;
+
+        request.status = vdp.usb.URB_STATUS_COMPLETED;
+        request.complete();
+
+    def dequeue(self, request):
+        print("ep1 dequeue = %d" % request.id);
 
 class TestInterface(vdp.usb.gadget.Interface):
     def __init__(self):
@@ -89,9 +130,6 @@ class TestInterface(vdp.usb.gadget.Interface):
     def enable(self, value):
         print("iface enable = %d" % value);
 
-    def destroy(self):
-        print("iface destroy");
-
 class TestConfig(vdp.usb.gadget.Config):
     def __init__(self):
         vdp.usb.gadget.Config.__init__(self, dict(
@@ -103,9 +141,6 @@ class TestConfig(vdp.usb.gadget.Config):
 
     def enable(self, value):
         print("config enable = %d" % value);
-
-    def destroy(self):
-        print("config destroy");
 
 class TestGadget(vdp.usb.gadget.Gadget):
     def __init__(self):
@@ -124,11 +159,15 @@ class TestGadget(vdp.usb.gadget.Gadget):
             configs = [TestConfig()],
             endpoint0 = TestEndpoint0()));
 
-    def destroy(self):
-        print("gadget destroy");
-        vdp.usb.gadget.Gadget.destroy(self);
+exiting = False;
+
+def sig_handler(signum, frame):
+    global exiting;
+    exiting = True;
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, sig_handler);
+
     ctx = vdp.usb.Context();
     gadget = TestGadget();
     try:
@@ -137,15 +176,11 @@ if __name__ == "__main__":
         device.attach(vdp.usb.SPEED_HIGH);
         fd = device.get_fd();
 
-        try:
-            while True:
-                rd, wr, er = select.select([fd], [], [])
-                if rd:
-                    gadget.event(device);
-        except KeyboardInterrupt:
-            pass
+        while not exiting:
+            rd, wr, er = select.select([fd], [], [])
+            if rd:
+                gadget.event(device);
 
         device.detach();
     except Exception, e:
         print("Error: %s" % e);
-    gadget.destroy();

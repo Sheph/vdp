@@ -28,19 +28,6 @@
 #include "vdp/byte_order.h"
 #include "structmember.h"
 
-struct vdp_py_usb_control_setup
-{
-    PyObject_HEAD
-    struct vdp_usb_control_setup control_setup;
-};
-
-struct vdp_py_usb_iso_packet
-{
-    PyObject_HEAD
-    PyObject* urb_wrapper;
-    struct vdp_usb_iso_packet* iso_packet;
-};
-
 static void vdp_py_usb_urb_wrapper_dealloc(struct vdp_py_usb_urb_wrapper* self)
 {
     vdp_usb_free_urb(self->urb);
@@ -441,15 +428,12 @@ static Py_ssize_t vdp_py_usb_iso_packet_getreadbuf(struct vdp_py_usb_iso_packet*
 
 static Py_ssize_t vdp_py_usb_iso_packet_getwritebuf(struct vdp_py_usb_iso_packet* self, Py_ssize_t index, const void** ptr)
 {
-    struct vdp_py_usb_urb_wrapper* urb_wrapper =
-        (struct vdp_py_usb_urb_wrapper*)self->urb_wrapper;
-
     if (index != 0) {
         PyErr_SetString(PyExc_SystemError, "accessing non-existent segment");
         return -1;
     }
 
-    if (VDP_USB_URB_ENDPOINT_OUT(urb_wrapper->urb->endpoint_address)) {
+    if (self->readonly) {
         return -1;
     }
 
@@ -479,12 +463,9 @@ static Py_ssize_t vdp_py_usb_iso_packet_getcharbuffer(struct vdp_py_usb_iso_pack
 
 static int vdp_py_usb_iso_packet_getbuffer(struct vdp_py_usb_iso_packet* self, Py_buffer* view, int flags)
 {
-    struct vdp_py_usb_urb_wrapper* urb_wrapper =
-        (struct vdp_py_usb_urb_wrapper*)self->urb_wrapper;
-
     return PyBuffer_FillInfo(view, (PyObject*)self,
         self->iso_packet->buffer, self->iso_packet->length,
-        VDP_USB_URB_ENDPOINT_OUT(urb_wrapper->urb->endpoint_address), flags);
+        self->readonly, flags);
 }
 
 static PyBufferProcs vdp_py_usb_iso_packet_as_buffer =
@@ -499,7 +480,7 @@ static PyBufferProcs vdp_py_usb_iso_packet_as_buffer =
 
 static void vdp_py_usb_iso_packet_dealloc(struct vdp_py_usb_iso_packet* self)
 {
-    Py_DECREF(self->urb_wrapper);
+    Py_DECREF(self->wrapper);
 
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
@@ -620,10 +601,34 @@ void vdp_py_usb_urb_init(PyObject* module)
     PyModule_AddObject(module, "ISOPacket", (PyObject*)&vdp_py_usb_iso_packettype);
 }
 
+PyObject* vdp_py_usb_control_setup_new(const struct vdp_usb_control_setup* control_setup)
+{
+    struct vdp_py_usb_control_setup* self =
+        (struct vdp_py_usb_control_setup*)PyObject_New(struct vdp_py_usb_control_setup, &vdp_py_usb_control_setuptype);
+
+    memcpy(&self->control_setup, control_setup, sizeof(*control_setup));
+
+    return (PyObject*)self;
+}
+
+PyObject* vdp_py_usb_iso_packet_new(PyObject* wrapper,
+    struct vdp_usb_iso_packet* packet, int readonly)
+{
+    struct vdp_py_usb_iso_packet* self =
+        (struct vdp_py_usb_iso_packet*)PyObject_New(struct vdp_py_usb_iso_packet, &vdp_py_usb_iso_packettype);
+
+    Py_INCREF(wrapper);
+    self->wrapper = wrapper;
+    self->iso_packet = packet;
+    self->readonly = readonly;
+
+    return (PyObject*)self;
+}
+
 PyObject* vdp_py_usb_urb_new(PyObject* device, struct vdp_usb_urb* urb)
 {
     struct vdp_py_usb_urb* self = (struct vdp_py_usb_urb*)PyObject_New(struct vdp_py_usb_urb, &vdp_py_usb_urbtype);
-    struct vdp_py_usb_control_setup* setup_packet;
+    struct vdp_usb_control_setup control_setup;
     struct vdp_py_usb_urb_wrapper* urb_wrapper;
     vdp_u32 i;
 
@@ -634,30 +639,22 @@ PyObject* vdp_py_usb_urb_new(PyObject* device, struct vdp_usb_urb* urb)
     self->urb_wrapper = (PyObject*)urb_wrapper;
     self->completed = 0;
 
-    setup_packet = (struct vdp_py_usb_control_setup*)PyObject_New(struct vdp_py_usb_control_setup, &vdp_py_usb_control_setuptype);
-    self->setup_packet = (PyObject*)setup_packet;
-
     if (urb->type == vdp_usb_urb_control) {
-        memcpy(&setup_packet->control_setup,
-            urb->setup_packet, sizeof(setup_packet->control_setup));
+        memcpy(&control_setup, urb->setup_packet, sizeof(control_setup));
     } else {
-        memset(&setup_packet->control_setup,
-            0, sizeof(setup_packet->control_setup));
+        memset(&control_setup, 0, sizeof(control_setup));
     }
+
+    self->setup_packet = vdp_py_usb_control_setup_new(&control_setup);
 
     self->iso_packet_list = PyList_New(0);
 
     if (urb->type == vdp_usb_urb_iso) {
         for (i = 0; i < urb->number_of_packets; ++i) {
-            struct vdp_py_usb_iso_packet* iso_packet =
-                (struct vdp_py_usb_iso_packet*)PyObject_New(struct vdp_py_usb_iso_packet, &vdp_py_usb_iso_packettype);
-
-            Py_INCREF((PyObject*)urb_wrapper);
-            iso_packet->urb_wrapper = (PyObject*)urb_wrapper;
-            iso_packet->iso_packet = &urb->iso_packets[i];
-
-            PyList_Append(self->iso_packet_list, (PyObject*)iso_packet);
-            Py_DECREF((PyObject*)iso_packet);
+            PyObject* iso_packet = vdp_py_usb_iso_packet_new((PyObject*)urb_wrapper,
+                &urb->iso_packets[i], VDP_USB_URB_ENDPOINT_OUT(urb->endpoint_address));
+            PyList_Append(self->iso_packet_list, iso_packet);
+            Py_DECREF(iso_packet);
         }
     }
 

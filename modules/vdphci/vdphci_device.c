@@ -564,14 +564,17 @@ static int vdphci_urb_hevent_write_common(u32 seq_num,
     }
     case PIPE_CONTROL: {
         data.type = vdphci_urb_type_control;
+        data.number_of_packets = 0;
         break;
     }
     case PIPE_BULK: {
         data.type = vdphci_urb_type_bulk;
+        data.number_of_packets = 0;
         break;
     }
     case PIPE_INTERRUPT: {
         data.type = vdphci_urb_type_int;
+        data.number_of_packets = 0;
         break;
     }
     case PIPE_ISOCHRONOUS:
@@ -604,6 +607,8 @@ static int vdphci_urb_hevent_write_common(u32 seq_num,
         } else {
             data.interval *= 125;
         }
+    } else {
+        data.interval = 0;
     }
 
     return vdphci_direct_write(sizeof(struct vdphci_hevent_header),

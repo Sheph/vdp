@@ -35,6 +35,20 @@ struct vdp_py_usb_urb_wrapper
     struct vdp_usb_urb* urb;
 };
 
+struct vdp_py_usb_control_setup
+{
+    PyObject_HEAD
+    struct vdp_usb_control_setup control_setup;
+};
+
+struct vdp_py_usb_iso_packet
+{
+    PyObject_HEAD
+    PyObject* wrapper;
+    struct vdp_usb_iso_packet* iso_packet;
+    int readonly;
+};
+
 struct vdp_py_usb_urb
 {
     PyObject_HEAD
@@ -47,6 +61,11 @@ struct vdp_py_usb_urb
 };
 
 void vdp_py_usb_urb_init(PyObject* module);
+
+PyObject* vdp_py_usb_control_setup_new(const struct vdp_usb_control_setup* control_setup);
+
+PyObject* vdp_py_usb_iso_packet_new(PyObject* wrapper,
+    struct vdp_usb_iso_packet* packet, int readonly);
 
 PyObject* vdp_py_usb_urb_new(PyObject* device, struct vdp_usb_urb* urb);
 struct vdp_py_usb_urb* vdp_py_usb_urb_check(PyObject* obj);
